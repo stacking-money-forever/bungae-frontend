@@ -96,7 +96,8 @@ a {
   animation: result-icon-enter var(--motion-slow) var(--motion-emphasized) both;
 }
 
-details[open] > :not(summary) {
+details[open] > :not(summary),
+.chat-content-reveal {
   animation: content-reveal var(--motion-base) var(--motion-standard) both;
 }
 
@@ -110,7 +111,6 @@ details[open] > :not(summary) {
 }
 
 :where(a, button, summary, [role="button"]):not(:disabled):active {
-  background-color: var(--bg-neutral-pressed);
   opacity: 0.72;
 }
 
@@ -131,6 +131,7 @@ label:has(input:not(:disabled)):active {
 @media (prefers-reduced-motion: reduce) {
   .result-section > :first-child,
   details[open] > :not(summary),
+  .chat-content-reveal,
   .bottom-navigation__active-mark {
     animation: none !important;
   }
@@ -405,10 +406,9 @@ label:has(input:not(:disabled)):active {
 .bottom-navigation__active-mark {
   position: absolute;
   top: -8px;
-  left: 50%;
+  left: calc(50% - 8px);
   width: 16px;
   height: 2px;
-  transform: translateX(-50%);
   background: var(--brand-accent);
 }
 

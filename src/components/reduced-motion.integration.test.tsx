@@ -109,8 +109,20 @@ describe("reduced motion integration", () => {
     const css = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
 
     expect(css).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(css).toContain(".chat-content-reveal");
     expect(css).toContain(".bottom-navigation__active-mark");
     expect(css).toContain("transition: none;");
+  });
+
+  it("does not paint a neutral rectangle behind unsurfaced controls when pressed", () => {
+    const css = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
+    const defaultPressedRule = css.match(
+      /:where\(a, button, summary, \[role="button"\]\):not\(:disabled\):active \{([^}]*)\}/,
+    )?.[1];
+
+    expect(defaultPressedRule).toContain("opacity: 0.72;");
+    expect(defaultPressedRule).not.toContain("background-color");
+    expect(css).toContain("background-color: var(--brand-accent-pressed);");
   });
 
   it("keeps the active mark available to the standalone navigation primitive", () => {

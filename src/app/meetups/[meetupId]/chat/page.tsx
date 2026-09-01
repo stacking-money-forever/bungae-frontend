@@ -8,7 +8,8 @@ import {
   Send,
   ShieldCheck,
 } from "lucide-react";
-import { FormEvent, useState } from "react";
+import { useReducedMotion } from "motion/react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 
 import { ScreenShell } from "@/components/screen-shell";
 import { TopNavigation } from "@/components/top-navigation";
@@ -19,6 +20,7 @@ type ChatMessage = {
   initials: string;
   text: string;
   mine?: boolean;
+  reveal?: boolean;
 };
 
 const initialMessages: ChatMessage[] = [
@@ -44,11 +46,39 @@ const initialMessages: ChatMessage[] = [
 ];
 
 export default function MeetupChatPage() {
+  const reduceMotion = useReducedMotion();
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [draft, setDraft] = useState("");
   const [guideOpen, setGuideOpen] = useState(false);
+  const [guideTargeted, setGuideTargeted] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
+  const guideRef = useRef<HTMLElement>(null);
+  const canSendMessage = draft.trim().length > 0;
+
+  useEffect(() => {
+    const openGuideFromHash = () => {
+      const targeted = window.location.hash === "#guide";
+      setGuideTargeted(targeted);
+      if (targeted) {
+        setGuideOpen(true);
+      }
+    };
+
+    openGuideFromHash();
+    window.addEventListener("hashchange", openGuideFromHash);
+    return () => window.removeEventListener("hashchange", openGuideFromHash);
+  }, []);
+
+  useEffect(() => {
+    if (guideOpen && guideTargeted) {
+      guideRef.current?.focus({ preventScroll: true });
+      guideRef.current?.scrollIntoView({
+        behavior: reduceMotion ? "auto" : "smooth",
+        block: "nearest",
+      });
+    }
+  }, [guideOpen, guideTargeted, reduceMotion]);
 
   const sendMessage = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -63,10 +93,23 @@ export default function MeetupChatPage() {
         initials: "나",
         text,
         mine: true,
+        reveal: true,
       },
     ]);
     setDraft("");
     setStatusMessage("메시지를 보냈어요.");
+  };
+
+  const toggleGuide = () => {
+    if (guideOpen && window.location.hash === "#guide") {
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${window.location.pathname}${window.location.search}`,
+      );
+      setGuideTargeted(false);
+    }
+    setGuideOpen((open) => !open);
   };
 
   return (
@@ -122,7 +165,7 @@ export default function MeetupChatPage() {
                 <div className={`flex max-w-[78%] flex-col ${message.mine ? "items-end" : "items-start"}`}>
                   {!message.mine ? <span className="mb-1 px-1 text-[length:var(--type-meta)] leading-4 text-[var(--fg-muted)]">{message.sender}</span> : null}
                   <p
-                    className={`m-0 w-fit max-w-[224px] whitespace-pre-wrap px-4 py-2 text-[length:var(--type-body)] leading-[22px] ${message.mine ? "rounded-2xl bg-[var(--brand-accent)] text-[var(--fg-on-brand)]" : "rounded-2xl bg-[var(--bg-layer-floating)] text-[var(--fg-neutral)]"}`}
+                    className={`m-0 w-fit max-w-[224px] whitespace-pre-wrap px-4 py-2 text-[length:var(--type-body)] leading-[22px] ${message.mine ? "rounded-2xl bg-[var(--brand-accent)] text-[var(--fg-on-brand)]" : "rounded-2xl bg-[var(--bg-layer-floating)] text-[var(--fg-neutral)]"} ${message.reveal ? "chat-content-reveal" : ""}`}
                   >
                     {message.text}
                   </p>
@@ -134,7 +177,13 @@ export default function MeetupChatPage() {
 
         <footer className="mb-[144px] shrink-0 space-y-2 px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-2">
           {guideOpen ? (
-            <section className="border border-[var(--stroke-neutral)] bg-[var(--bg-layer-floating)] px-4 py-3" aria-label="첫 10분 진행 가이드">
+            <section
+              ref={guideRef}
+              id="guide"
+              tabIndex={-1}
+              className="chat-content-reveal border border-[var(--stroke-neutral)] bg-[var(--bg-layer-floating)] px-4 py-3 focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
+              aria-label="첫 10분 진행 가이드"
+            >
               <h2 className="m-0 text-[length:var(--type-section)] font-bold leading-6 text-[var(--fg-neutral)]">첫 10분 진행 가이드</h2>
               <ol className="m-0 mt-2 list-decimal space-y-1 pl-5 text-[length:var(--type-body)] leading-[22px] text-[var(--fg-muted)]">
                 <li>서로의 이름과 오늘 기대하는 것을 짧게 소개해요.</li>
@@ -146,7 +195,7 @@ export default function MeetupChatPage() {
             type="button"
             className="flex min-h-[52px] w-full items-center gap-3 bg-[var(--bg-layer-floating)] px-4 text-left focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
             aria-expanded={guideOpen}
-            onClick={() => setGuideOpen((open) => !open)}
+            onClick={toggleGuide}
           >
             <ListChecks className="shrink-0 text-[var(--fg-neutral)]" size={24} strokeWidth={1.8} aria-hidden="true" />
             <span className="min-w-0 flex-1">
@@ -169,7 +218,8 @@ export default function MeetupChatPage() {
             </label>
             <button
               type="submit"
-              className="inline-flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full bg-[var(--brand-accent)] text-[var(--fg-on-brand)] focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
+              disabled={!canSendMessage}
+              className="inline-flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full bg-[var(--brand-accent)] text-[var(--fg-on-brand)] focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
               aria-label="메시지 보내기"
             >
               <Send size={23} strokeWidth={1.8} aria-hidden="true" />
