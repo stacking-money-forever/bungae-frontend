@@ -1,8 +1,8 @@
 import { ChevronDown, Plus, Zap } from "lucide-react";
 import Link from "next/link";
 
-import { BottomNavigation } from "@/components/bottom-navigation";
 import { MeetupListRow, type MeetupListRowProps } from "@/components/meetup-list-row";
+import { NavigationLink } from "@/components/navigation-link";
 
 const meetups: MeetupListRowProps[] = [
   {
@@ -46,20 +46,25 @@ export default function HomePage() {
             <span className="brand-wordmark font-display !text-[length:var(--type-wordmark)] !leading-6">벙개</span>
           </Link>
 
-          <Link
+          <NavigationLink
             className="location-link font-display !text-[length:var(--type-page-title)] !leading-6"
             href="/filters"
+            navigationIntent="sheet"
             aria-label="현재 위치 마포구 망원동"
           >
             <span>마포구 망원동</span>
             <ChevronDown size={18} strokeWidth={1.8} aria-hidden="true" />
-          </Link>
+          </NavigationLink>
 
           <div className="filter-row">
             <p className="filter-summary !text-[length:var(--type-body)] !leading-[22px]">오늘 · 2km · 무료</p>
-            <Link className="filter-link !text-[length:var(--type-action)] !leading-6" href="/filters">
+            <NavigationLink
+              className="filter-link !text-[length:var(--type-action)] !leading-6"
+              href="/filters"
+              navigationIntent="sheet"
+            >
               필터 변경
-            </Link>
+            </NavigationLink>
           </div>
         </header>
 
@@ -85,7 +90,6 @@ export default function HomePage() {
           <span>모임 만들기</span>
         </Link>
 
-        <BottomNavigation activeTab="explore" />
       </div>
     </main>
   );

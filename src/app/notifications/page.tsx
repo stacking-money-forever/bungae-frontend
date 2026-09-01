@@ -13,8 +13,6 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-import { BottomNavigation } from "@/components/bottom-navigation";
-
 type NotificationItem = {
   id: string;
   title: string;
@@ -196,7 +194,6 @@ export default function NotificationsPage() {
         <p className="sr-only" aria-live="polite">
           {statusMessage}
         </p>
-        <BottomNavigation activeTab="notifications" />
       </div>
     </main>
   );

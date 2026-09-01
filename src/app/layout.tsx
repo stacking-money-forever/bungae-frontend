@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import { Do_Hyeon, Gowun_Dodum } from "next/font/google";
+import { Suspense } from "react";
+
+import { PageTransition } from "@/components/page-transition";
+import { PersistentBottomNavigation } from "@/components/persistent-bottom-navigation";
 
 import "./globals.css";
 
@@ -29,7 +33,18 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className={`${doHyeon.variable} ${gowunDodum.variable}`}>
-      <body>{children}</body>
+      <body>
+        <Suspense
+          fallback={
+            <div className="route-stage">
+              <div className="route-transition">{children}</div>
+            </div>
+          }
+        >
+          <PageTransition>{children}</PageTransition>
+        </Suspense>
+        <PersistentBottomNavigation />
+      </body>
     </html>
   );
 }

@@ -7,8 +7,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { BottomNavigation } from "@/components/bottom-navigation";
-
 type MeetupFixture = {
   title: string;
   dateTime: string;
@@ -157,7 +155,6 @@ export default function MyMeetupsPage() {
           </div>
         </div>
 
-        <BottomNavigation activeTab="my-meetups" />
       </div>
     </main>
   );

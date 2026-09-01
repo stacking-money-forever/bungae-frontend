@@ -1,6 +1,8 @@
-import Link, { type LinkProps } from "next/link";
+import type { LinkProps } from "next/link";
 import { ArrowLeft } from "lucide-react";
 import type { HTMLAttributes, ReactNode } from "react";
+
+import { NavigationLink } from "@/components/navigation-link";
 
 export interface TopNavigationProps
   extends Omit<HTMLAttributes<HTMLElement>, "children" | "title"> {
@@ -27,13 +29,14 @@ export function TopNavigation({
 
   return (
     <header className={navigationClassName} {...rest}>
-      <Link
+      <NavigationLink
         className="inline-flex min-h-[var(--target-min)] min-w-[var(--target-min)] shrink-0 items-center justify-center text-[var(--fg-neutral)] focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-[3px]"
         href={href}
+        navigationIntent="pop"
         aria-label={backLabel}
       >
         <ArrowLeft size={24} strokeWidth={1.8} aria-hidden="true" />
-      </Link>
+      </NavigationLink>
 
       {title !== undefined && title !== null ? (
         <h1 className="font-display min-w-0 flex-1 truncate text-[length:var(--type-page-title)] font-normal leading-6 text-[var(--fg-neutral)]">

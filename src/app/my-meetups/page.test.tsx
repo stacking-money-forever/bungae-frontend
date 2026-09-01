@@ -4,12 +4,10 @@ import { describe, expect, it } from "vitest";
 import MyMeetupsPage from "./page";
 
 describe("MyMeetupsPage", () => {
-  it("renders a root list instead of deep-linking the primary tab to one meetup", () => {
+  it("renders a root list without pushed-screen navigation", () => {
     render(<MyMeetupsPage />);
 
-    const myMeetupsTab = screen.getByRole("link", { name: "내 모임" });
-    expect(myMeetupsTab).toHaveAttribute("href", "/my-meetups");
-    expect(myMeetupsTab).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("heading", { name: "내 모임" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "뒤로가기" })).not.toBeInTheDocument();
 
     expect(screen.getByRole("link", { name: /퇴근 후 한강 산책/ })).toHaveAttribute(

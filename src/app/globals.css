@@ -40,6 +40,11 @@
   --type-body: 14px;
   --type-action: 16px;
   --type-meta: 11px;
+  --motion-fast: 90ms;
+  --motion-base: 180ms;
+  --motion-slow: 240ms;
+  --motion-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-emphasized: cubic-bezier(0.2, 0.9, 0.2, 1);
 }
 
 * {
@@ -75,6 +80,26 @@ a {
   font-family: var(--font-body);
 }
 
+.route-stage {
+  display: grid;
+  min-height: 100svh;
+  overflow-x: clip;
+}
+
+.route-transition {
+  grid-area: 1 / 1;
+  min-height: 100svh;
+  min-width: 0;
+}
+
+.result-section > :first-child {
+  animation: result-icon-enter var(--motion-slow) var(--motion-emphasized) both;
+}
+
+details[open] > :not(summary) {
+  animation: content-reveal var(--motion-base) var(--motion-standard) both;
+}
+
 :where(a, button, summary, [role="button"], label:has(input)) {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
@@ -104,8 +129,38 @@ label:has(input:not(:disabled)):active {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .result-section > :first-child,
+  details[open] > :not(summary),
+  .bottom-navigation__active-mark {
+    animation: none !important;
+  }
+
   :where(a, button, summary, [role="button"], label:has(input)) {
     transition: none;
+  }
+}
+
+@keyframes result-icon-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes content-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

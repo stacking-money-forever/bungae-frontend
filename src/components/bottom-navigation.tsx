@@ -1,5 +1,9 @@
-import Link from "next/link";
+"use client";
+
 import { Bell, CalendarDays, Compass, type LucideIcon } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
+
+import { NavigationLink } from "@/components/navigation-link";
 
 export type BottomNavigationTab = "explore" | "my-meetups" | "notifications";
 
@@ -21,22 +25,36 @@ const navigationItems: NavigationItem[] = [
 ];
 
 export function BottomNavigation({ activeTab }: BottomNavigationProps) {
+  const reduceMotion = useReducedMotion();
+
   return (
     <nav className="bottom-navigation" aria-label="주요 메뉴">
       {navigationItems.map(({ id, label, href, icon: Icon }) => {
         const isActive = id === activeTab;
 
         return (
-          <Link
+          <NavigationLink
             key={id}
             className="bottom-navigation__item"
             href={href}
+            navigationIntent="tab"
             aria-current={isActive ? "page" : undefined}
           >
             <Icon className="bottom-navigation__icon" size={24} strokeWidth={1.8} aria-hidden="true" />
             <span className="bottom-navigation__label text-[12px] leading-4">{label}</span>
-            {isActive ? <span className="bottom-navigation__active-mark" aria-hidden="true" /> : null}
-          </Link>
+            {isActive ? (
+              <motion.span
+                layoutId="bottom-navigation-active-mark"
+                className="bottom-navigation__active-mark"
+                transition={
+                  reduceMotion
+                    ? { duration: 0 }
+                    : { type: "spring", stiffness: 420, damping: 34, mass: 0.7 }
+                }
+                aria-hidden="true"
+              />
+            ) : null}
+          </NavigationLink>
         );
       })}
     </nav>
