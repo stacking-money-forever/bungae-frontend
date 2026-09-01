@@ -14,21 +14,38 @@ import {
   Settings,
   type LucideIcon,
 } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useRef, useState, type ButtonHTMLAttributes, type FormEvent, type Ref } from "react";
 
+import {
+  AnimatedDialog,
+  AnimatedDialogClose,
+  AnimatedDialogDescription,
+  AnimatedDialogTitle,
+} from "@/components/animated-dialog";
 import { ScreenShell } from "@/components/screen-shell";
 import { TopNavigation } from "@/components/top-navigation";
 
-type ProfileRowProps = {
+type ProfileRowProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onClick" | "title"> & {
   icon: LucideIcon;
   title: string;
   description?: string;
   href?: string;
   onClick?: () => void;
   muted?: boolean;
+  ref?: Ref<HTMLButtonElement>;
 };
 
-function ProfileRow({ icon: Icon, title, description, href, onClick, muted = false }: ProfileRowProps) {
+function ProfileRow({
+  icon: Icon,
+  title,
+  description,
+  href,
+  onClick,
+  muted = false,
+  ref,
+  ...buttonProps
+}: ProfileRowProps) {
   const content = (
     <>
       <Icon className={`shrink-0 ${muted ? "text-[var(--fg-muted)]" : "text-[var(--fg-neutral)]"}`} size={25} strokeWidth={1.8} aria-hidden="true" />
@@ -53,9 +70,11 @@ function ProfileRow({ icon: Icon, title, description, href, onClick, muted = fal
 
   return (
     <button
+      {...buttonProps}
       type="button"
       className="flex min-h-[44px] w-full items-center gap-3 text-left focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-[-2px]"
       onClick={onClick}
+      ref={ref}
     >
       {content}
     </button>
@@ -63,8 +82,10 @@ function ProfileRow({ icon: Icon, title, description, href, onClick, muted = fal
 }
 
 export default function ProfilePage() {
+  const reduceMotion = useReducedMotion();
   const [logoutRequested, setLogoutRequested] = useState(false);
   const [loggedOut, setLoggedOut] = useState(false);
+  const logoutCommitRequested = useRef(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [profile, setProfile] = useState({
     name: "민지",
@@ -74,7 +95,13 @@ export default function ProfilePage() {
   });
 
   const confirmLogout = () => {
+    logoutCommitRequested.current = true;
     setLogoutRequested(false);
+  };
+
+  const commitLogoutAfterExit = () => {
+    if (!logoutCommitRequested.current) return;
+    logoutCommitRequested.current = false;
     setLoggedOut(true);
   };
 
@@ -129,34 +156,48 @@ export default function ProfilePage() {
         <ChevronRight className="text-[var(--fg-muted)]" size={22} strokeWidth={1.8} aria-hidden="true" />
       </button>
 
-      {editingProfile ? (
-        <form className="grid gap-3 border-y border-[var(--stroke-neutral)] py-4" onSubmit={saveProfile}>
-          {([
-            ["name", "표시 이름", profile.name],
-            ["interests", "관심 활동", profile.interests],
-            ["area", "활동 지역", profile.area],
-            ["availability", "활동 가능 시간", profile.availability],
-          ] as const).map(([name, label, value]) => (
-            <label className="grid gap-1 text-[14px] text-[var(--fg-muted)]" key={name}>
-              {label}
-              <input
-                className="min-h-[44px] border border-[var(--stroke-neutral)] bg-[var(--bg-layer-floating)] px-3 text-[16px] text-[var(--fg-neutral)]"
-                defaultValue={value}
-                name={name}
-                required
-              />
-            </label>
-          ))}
-          <div className="flex gap-2">
-            <button className="min-h-[44px] flex-1 border border-[var(--stroke-neutral)]" type="button" onClick={() => setEditingProfile(false)}>
-              취소
-            </button>
-            <button className="min-h-[44px] flex-1 bg-[var(--brand-accent)] font-bold text-[var(--fg-on-brand)]" type="submit">
-              저장하기
-            </button>
-          </div>
-        </form>
-      ) : null}
+      <AnimatePresence initial={false}>
+        {editingProfile ? (
+          <motion.form
+            key="profile-edit-form"
+            className="grid gap-3 overflow-hidden border-y border-[var(--stroke-neutral)] py-4"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={
+              reduceMotion
+                ? { duration: 0 }
+                : { type: "tween", duration: 0.18, ease: "easeOut" }
+            }
+            onSubmit={saveProfile}
+          >
+            {([
+              ["name", "표시 이름", profile.name],
+              ["interests", "관심 활동", profile.interests],
+              ["area", "활동 지역", profile.area],
+              ["availability", "활동 가능 시간", profile.availability],
+            ] as const).map(([name, label, value]) => (
+              <label className="grid gap-1 text-[14px] text-[var(--fg-muted)]" key={name}>
+                {label}
+                <input
+                  className="min-h-[44px] border border-[var(--stroke-neutral)] bg-[var(--bg-layer-floating)] px-3 text-[16px] text-[var(--fg-neutral)]"
+                  defaultValue={value}
+                  name={name}
+                  required
+                />
+              </label>
+            ))}
+            <div className="flex gap-2">
+              <button className="min-h-[44px] flex-1 border border-[var(--stroke-neutral)]" type="button" onClick={() => setEditingProfile(false)}>
+                취소
+              </button>
+              <button className="min-h-[44px] flex-1 bg-[var(--brand-accent)] font-bold text-[var(--fg-on-brand)]" type="submit">
+                저장하기
+              </button>
+            </div>
+          </motion.form>
+        ) : null}
+      </AnimatePresence>
 
       <section aria-labelledby="my-info-title">
         <h2 id="my-info-title" className="m-0 mt-1 text-[13px] font-normal leading-5 text-[var(--fg-muted)]">내 정보</h2>
@@ -170,26 +211,44 @@ export default function ProfilePage() {
         <ProfileRow icon={Bell} title="알림 설정" href="/notifications" />
         <ProfileRow icon={Ban} title="차단 목록" href="/profile/blocks" />
         <ProfileRow icon={Link2} title="연결 목록" href="/connections" />
-        <ProfileRow icon={LogOut} title={loggedOut ? "로그아웃 완료" : "로그아웃"} muted onClick={() => setLogoutRequested(true)} />
-      </section>
+        <AnimatedDialog
+          open={logoutRequested}
+          onOpenChange={(open) => {
+            if (open) {
+              setLogoutRequested(true);
+              return;
+            }
 
-      {loggedOut ? (
-        <p className="m-0 pt-3 text-[14px] leading-5 text-[var(--fg-muted)]" role="status">다시 로그인하면 모임을 계속 이용할 수 있어요.</p>
-      ) : null}
-
-      {logoutRequested ? (
-        <div className="mt-3 border border-[var(--stroke-neutral)] bg-[var(--bg-layer-floating)] p-4" role="alertdialog" aria-modal="true" aria-labelledby="logout-title">
-          <h2 id="logout-title" className="m-0 text-[16px] font-bold leading-6 text-[var(--fg-neutral)]">로그아웃할까요?</h2>
-          <p className="m-0 mt-2 text-[14px] leading-5 text-[var(--fg-muted)]">다시 로그인해야 내 모임과 연결을 확인할 수 있어요.</p>
+            logoutCommitRequested.current = false;
+            setLogoutRequested(false);
+          }}
+          onExitComplete={commitLogoutAfterExit}
+          placement="center"
+          trigger={
+            <ProfileRow
+              icon={LogOut}
+              title={loggedOut ? "로그아웃 완료" : "로그아웃"}
+              muted
+              onClick={() => setLogoutRequested(true)}
+            />
+          }
+        >
+          <AnimatedDialogTitle className="m-0 text-[16px] font-bold leading-6 text-[var(--fg-neutral)]">
+            로그아웃할까요?
+          </AnimatedDialogTitle>
+          <AnimatedDialogDescription className="m-0 mt-2 text-[14px] leading-5 text-[var(--fg-muted)]">
+            다시 로그인해야 내 모임과 연결을 확인할 수 있어요.
+          </AnimatedDialogDescription>
           <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              className="min-h-[44px] flex-1 border border-[var(--stroke-neutral)] px-3 text-[15px] text-[var(--fg-neutral)] focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
-              onClick={() => setLogoutRequested(false)}
-              autoFocus
-            >
-              취소
-            </button>
+            <AnimatedDialogClose asChild>
+              <button
+                type="button"
+                className="min-h-[44px] flex-1 border border-[var(--stroke-neutral)] px-3 text-[15px] text-[var(--fg-neutral)] focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
+                autoFocus
+              >
+                취소
+              </button>
+            </AnimatedDialogClose>
             <button
               type="button"
               className="min-h-[44px] flex-1 bg-[var(--fg-neutral)] px-3 text-[15px] text-[var(--bg-layer-floating)] focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
@@ -198,8 +257,13 @@ export default function ProfilePage() {
               로그아웃
             </button>
           </div>
-        </div>
+        </AnimatedDialog>
+      </section>
+
+      {loggedOut ? (
+        <p className="m-0 pt-3 text-[14px] leading-5 text-[var(--fg-muted)]" role="status">다시 로그인하면 모임을 계속 이용할 수 있어요.</p>
       ) : null}
+
     </ScreenShell>
   );
 }
