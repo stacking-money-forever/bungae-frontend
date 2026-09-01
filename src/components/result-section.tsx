@@ -63,7 +63,7 @@ export function ResultSection({
   const descriptionId = hasDescription ? `${generatedId}-description` : undefined;
   const { backgroundClassName, foregroundClassName, icon: Icon } = resultToneStyles[tone];
   const sectionClassName = [
-    "flex w-full flex-col items-center gap-[var(--dimension-x4)] px-[var(--dimension-x5)] py-[var(--dimension-x6)]",
+    "result-section flex w-full flex-col items-center gap-[var(--dimension-x4)] px-[var(--dimension-x5)] py-[var(--dimension-x6)]",
     className,
   ]
     .filter(Boolean)
