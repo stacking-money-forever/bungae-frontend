@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState, type FormEvent } from "react";
 
 import { BottomActionBar } from "@/components/bottom-action-bar";
+import { setNavigationIntent } from "@/components/navigation-intent";
 import { ResultSection } from "@/components/result-section";
 import { ScreenShell } from "@/components/screen-shell";
 import { StatusBanner } from "@/components/status-banner";
@@ -67,18 +68,20 @@ function ReviewInput({ id, label, value, onChange }: ReviewInputProps) {
   );
 }
 
-export default function NewMeetupPage() {
+function NewMeetupPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const postedParam = searchParams?.get("posted");
+  const posted = postedParam === "1";
   const [values, setValues] = useState(initialValues);
-  const [posted, setPosted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPosting, setIsPosting] = useState(false);
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("posted") === "1") {
-      setPosted(true);
+    if (posted) {
+      setIsPosting(false);
     }
-  }, []);
+  }, [posted]);
 
   const updateValue = (id: keyof CreateFormValues, value: string) => {
     setValues((current) => ({ ...current, [id]: value }));
@@ -98,7 +101,7 @@ export default function NewMeetupPage() {
     }
 
     setIsPosting(true);
-    setPosted(true);
+    setNavigationIntent("push", "/meetups/new?posted=1");
     router.push("/meetups/new?posted=1");
   };
 
@@ -254,5 +257,25 @@ export default function NewMeetupPage() {
         </button>
       </BottomActionBar>
     </ScreenShell>
+  );
+}
+
+function NewMeetupFallback() {
+  return (
+    <ScreenShell bottomSpacing aria-label="벙개 화면 불러오기">
+      <div className="flex flex-1 items-center justify-center px-[var(--dimension-x5)] pb-8 pt-6">
+        <p role="status" className="m-0 text-[length:var(--type-body)] leading-5 text-[var(--fg-muted)]">
+          화면을 불러오는 중이에요
+        </p>
+      </div>
+    </ScreenShell>
+  );
+}
+
+export default function NewMeetupPage() {
+  return (
+    <Suspense fallback={<NewMeetupFallback />}>
+      <NewMeetupPageContent />
+    </Suspense>
   );
 }
