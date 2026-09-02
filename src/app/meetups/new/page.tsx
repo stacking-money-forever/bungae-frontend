@@ -1,80 +1,134 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState, type FormEvent } from "react";
 
 import { BottomActionBar } from "@/components/bottom-action-bar";
 import { setNavigationIntent } from "@/components/navigation-intent";
+import { PlacePicker } from "@/components/place-picker";
 import { ResultSection } from "@/components/result-section";
 import { ScreenShell } from "@/components/screen-shell";
 import { StatusBanner } from "@/components/status-banner";
+import { TimeWheelPicker } from "@/components/time-wheel-picker";
 import { TopNavigation } from "@/components/top-navigation";
+import {
+  createTimeOptions,
+  createInitialValues,
+  getTimeLabel,
+  validateMeetupForm,
+  type CreateFormErrors,
+  type CreateFormValues,
+} from "@/lib/meetup-form";
 
-interface CreateFormValues {
-  activity: string;
-  title: string;
-  purpose: string;
-  start: string;
-  end: string;
-  location: string;
-  minimum: string;
-  capacity: string;
-  costAlcohol: string;
-  deadline: string;
-}
-
-const initialValues: CreateFormValues = {
-  activity: "산책",
-  title: "퇴근 후 한강 산책",
-  purpose: "20분 산책 후 카페에서 이야기 나눠요",
-  start: "오늘 18:30",
-  end: "20:00",
-  location: "망원한강공원 · 공개 장소",
-  minimum: "최소 3명",
-  capacity: "정원 6명",
-  costAlcohol: "무료 · 음주 없음",
-  deadline: "오늘 17:30",
-};
-
-interface ReviewInputProps {
+interface TextFieldProps {
   id: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
+  placeholder?: string;
+  error?: string;
+  multiline?: boolean;
 }
 
-function ReviewInput({ id, label, value, onChange }: ReviewInputProps) {
-  const valueTypography =
-    id === "time" || id === "deadline"
-      ? "font-display text-[length:var(--type-time)] font-normal leading-6"
-      : "text-[length:var(--type-title)] font-semibold leading-5";
+function TextField({ id, label, value, onChange, placeholder, error, multiline = false }: TextFieldProps) {
+  const sharedClassName =
+    "mt-1 min-h-[28px] w-full resize-none bg-transparent text-[14px] font-semibold leading-5 text-[var(--fg-neutral)] outline-none placeholder:font-normal placeholder:text-[var(--fg-muted)]";
 
   return (
-    <div className="grid min-h-[52px] grid-cols-[72px_minmax(0,1fr)] items-center gap-3 border-b border-[var(--stroke-neutral)]">
-      <label className="text-[length:var(--type-body)] leading-5 text-[var(--fg-muted)]" htmlFor={id}>
-        {label}
-      </label>
-      <input
-        className={`min-h-[44px] min-w-0 w-full bg-transparent text-right ${valueTypography} text-[var(--fg-neutral)] outline-none focus-visible:rounded-[var(--dimension-x1)] focus-visible:ring-2 focus-visible:ring-[var(--fg-neutral)]`}
-        id={id}
-        name={id}
-        type="text"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        aria-label={`${label} 입력`}
-      />
-    </div>
+    <label
+      className={`block rounded-[12px] border bg-[var(--bg-layer-floating)] px-4 py-2.5 transition-colors focus-within:ring-2 focus-within:ring-[var(--fg-neutral)] focus-within:ring-offset-2 ${
+        error ? "border-[var(--fg-critical)]" : "border-[var(--stroke-neutral)] focus-within:border-[var(--fg-neutral)]"
+      }`}
+      htmlFor={id}
+    >
+      <span className="block text-[12px] leading-4 text-[var(--fg-muted)]">{label}</span>
+      {multiline ? (
+        <textarea
+          className={`${sharedClassName} min-h-[52px]`}
+          id={id}
+          name={id}
+          rows={2}
+          value={value}
+          placeholder={placeholder}
+          aria-label={label}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${id}-error` : undefined}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      ) : (
+        <input
+          className={sharedClassName}
+          id={id}
+          name={id}
+          type="text"
+          value={value}
+          placeholder={placeholder}
+          aria-label={label}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${id}-error` : undefined}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      )}
+      {error ? (
+        <span id={`${id}-error`} className="mt-1 block text-[12px] font-normal leading-4 text-[var(--fg-critical)]">
+          {error}
+        </span>
+      ) : null}
+    </label>
+  );
+}
+
+interface NumberFieldProps {
+  id: "minimum" | "capacity";
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  error?: string;
+}
+
+function NumberField({ id, label, value, onChange, error }: NumberFieldProps) {
+  return (
+    <label
+      className={`block rounded-[12px] border bg-[var(--bg-layer-floating)] px-4 py-2.5 transition-colors focus-within:ring-2 focus-within:ring-[var(--fg-neutral)] focus-within:ring-offset-2 ${
+        error ? "border-[var(--fg-critical)]" : "border-[var(--stroke-neutral)] focus-within:border-[var(--fg-neutral)]"
+      }`}
+      htmlFor={id}
+    >
+      <span className="block text-[12px] leading-4 text-[var(--fg-muted)]">{label}</span>
+      <span className="mt-1 flex items-center gap-1">
+        <input
+          className="min-h-[28px] min-w-0 flex-1 bg-transparent text-[18px] font-bold leading-6 text-[var(--fg-neutral)] outline-none"
+          id={id}
+          name={id}
+          type="text"
+          aria-label={label}
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={value}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${id}-error` : undefined}
+          onChange={(event) => onChange(event.target.value.replace(/[^0-9]/g, ""))}
+        />
+        <span className="text-[13px] text-[var(--fg-muted)]">명</span>
+      </span>
+      {error ? (
+        <span id={`${id}-error`} className="mt-1 block text-[12px] font-normal leading-4 text-[var(--fg-critical)]">
+          {error}
+        </span>
+      ) : null}
+    </label>
   );
 }
 
 function NewMeetupPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const postedParam = searchParams?.get("posted");
-  const posted = postedParam === "1";
-  const [values, setValues] = useState(initialValues);
-  const [error, setError] = useState<string | null>(null);
+  const posted = searchParams?.get("posted") === "1";
+  const [timeOptions] = useState(() => createTimeOptions());
+  const [values, setValues] = useState(() => createInitialValues(timeOptions));
+  const [errors, setErrors] = useState<CreateFormErrors>({});
   const [isPosting, setIsPosting] = useState(false);
 
   useEffect(() => {
@@ -83,23 +137,55 @@ function NewMeetupPageContent() {
     }
   }, [posted]);
 
-  const updateValue = (id: keyof CreateFormValues, value: string) => {
+  const clearErrors = (...ids: Array<keyof CreateFormErrors>) => {
+    setErrors((current) => {
+      if (!ids.some((id) => current[id])) {
+        return current;
+      }
+      const next = { ...current };
+      ids.forEach((id) => delete next[id]);
+      return next;
+    });
+  };
+
+  const updateValue = <Key extends keyof CreateFormValues>(id: Key, value: CreateFormValues[Key]) => {
     setValues((current) => ({ ...current, [id]: value }));
-    if (id === "title" && value.trim().length > 0) {
-      setError(null);
+
+    if (id === "start" || id === "end") {
+      clearErrors("start", "end", "deadline");
+    } else if (id === "deadline") {
+      clearErrors("deadline");
+    } else if (id === "minimum" || id === "capacity") {
+      clearErrors("minimum", "capacity");
+    } else if (id === "title") {
+      clearErrors("title");
+    } else if (id === "place") {
+      clearErrors("place");
     }
   };
 
   const postMeetup = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!values.title.trim()) {
-      setError("모임 제목을 입력해 주세요.");
+    const nextErrors = validateMeetupForm(values);
+    const firstError = Object.keys(nextErrors)[0] as keyof CreateFormErrors | undefined;
+
+    if (firstError) {
+      setErrors(nextErrors);
+      window.requestAnimationFrame(() => {
+        const targetId = firstError === "start" || firstError === "end" || firstError === "deadline"
+          ? `${firstError}-trigger`
+          : firstError === "place"
+            ? "place-trigger"
+            : firstError;
+        document.getElementById(targetId)?.focus();
+      });
       return;
     }
     if (isPosting) {
       return;
     }
 
+    setErrors({});
     setIsPosting(true);
     setNavigationIntent("push", "/meetups/new?posted=1");
     router.push("/meetups/new?posted=1");
@@ -117,7 +203,7 @@ function NewMeetupPageContent() {
         >
           <StatusBanner
             tone="positive"
-            label="오늘 18:30 · 망원한강공원"
+            label={`${getTimeLabel(values.start, timeOptions)} · ${values.place?.name ?? "장소 미정"}`}
             description="생성 후 24시간 안에 시작하는 공개 모임이에요."
           />
         </ResultSection>
@@ -133,111 +219,73 @@ function NewMeetupPageContent() {
     );
   }
 
+  const errorMessages = Object.values(errors);
+
   return (
     <ScreenShell bottomSpacing aria-label="모임 만들기 검토">
-      <TopNavigation href="/" title="검토" />
-      <form
-        className="px-[var(--dimension-x5)] pb-8 pt-6"
-        id="create-meetup-form"
-        onSubmit={postMeetup}
-      >
+      <TopNavigation className="sticky top-0 z-20 border-b border-[var(--stroke-neutral)] bg-[var(--bg-layer-default)]" href="/" title="모임 만들기" />
+      <form className="px-[var(--dimension-x5)] pb-8 pt-5" id="create-meetup-form" noValidate onSubmit={postMeetup}>
         <h2 className="m-0 font-display text-[length:var(--type-headline)] font-normal leading-8 text-[var(--fg-neutral)]">
-          이대로 모임을 만들까요?
+          어떤 벙개를 열까요?
         </h2>
+        <p className="m-0 mt-1 text-[13px] leading-5 text-[var(--fg-muted)]">
+          필요한 정보만 빠르게 정하면 바로 모집을 시작해요.
+        </p>
 
-        {error ? (
-          <StatusBanner className="mt-4 rounded-[var(--dimension-x2)]" tone="critical" label={error} />
+        {errorMessages.length > 0 ? (
+          <StatusBanner
+            className="mt-4 rounded-[12px]"
+            tone="critical"
+            label={`${errorMessages.length}개 항목을 확인해 주세요.`}
+            description={errorMessages[0]}
+          />
         ) : null}
 
-        <div className="mt-5 border-t border-[var(--stroke-neutral)]">
-          <div className="grid min-h-[52px] grid-cols-[72px_minmax(0,1fr)] items-center gap-3 border-b border-[var(--stroke-neutral)]">
-            <label className="text-[length:var(--type-body)] leading-5 text-[var(--fg-muted)]" htmlFor="activity">
-              활동
-            </label>
-            <div className="flex min-w-0 items-center gap-2">
-              <select
-                className="min-h-[44px] min-w-0 shrink-0 appearance-none bg-transparent text-[length:var(--type-title)] font-semibold leading-5 text-[var(--fg-neutral)] outline-none focus-visible:rounded-[var(--dimension-x1)] focus-visible:ring-2 focus-visible:ring-[var(--fg-neutral)]"
-                id="activity"
-                value={values.activity}
-                onChange={(event) => updateValue("activity", event.target.value)}
-                aria-label="활동 선택"
-              >
-                <option>산책</option>
-                <option>식사</option>
-                <option>보드게임</option>
-                <option>카페 대화</option>
-              </select>
-              <span aria-hidden="true">·</span>
-              <input
-                className="min-h-[44px] min-w-0 flex-1 bg-transparent text-right text-[length:var(--type-title)] font-semibold leading-5 text-[var(--fg-neutral)] outline-none focus-visible:rounded-[var(--dimension-x1)] focus-visible:ring-2 focus-visible:ring-[var(--fg-neutral)]"
-                id="title"
-                name="title"
-                type="text"
-                value={values.title}
-                onChange={(event) => updateValue("title", event.target.value)}
-                aria-label="모임 제목 입력"
-              />
+        <div className="mt-5 space-y-3">
+          <label className="relative block rounded-[12px] border border-[var(--stroke-neutral)] bg-[var(--bg-layer-floating)] px-4 py-2.5 focus-within:border-[var(--fg-neutral)] focus-within:ring-2 focus-within:ring-[var(--fg-neutral)] focus-within:ring-offset-2" htmlFor="activity">
+            <span className="block text-[12px] leading-4 text-[var(--fg-muted)]">활동</span>
+            <select
+              className="mt-1 min-h-[28px] w-full appearance-none bg-transparent pr-8 text-[14px] font-semibold leading-5 text-[var(--fg-neutral)] outline-none"
+              id="activity"
+              value={values.activity}
+              onChange={(event) => updateValue("activity", event.target.value)}
+              aria-label="활동 선택"
+            >
+              <option>산책</option>
+              <option>식사</option>
+              <option>보드게임</option>
+              <option>카페 대화</option>
+            </select>
+            <ChevronDown className="pointer-events-none absolute bottom-[17px] right-4 text-[var(--fg-muted)]" size={18} strokeWidth={1.8} aria-hidden="true" />
+          </label>
+
+          <TextField id="title" label="모임 제목" value={values.title} placeholder="무엇을 함께 할지 적어 주세요" error={errors.title} onChange={(value) => updateValue("title", value)} />
+          <TextField id="purpose" label="한 줄 소개" value={values.purpose} placeholder="모임의 분위기와 목적을 알려 주세요" multiline onChange={(value) => updateValue("purpose", value)} />
+
+          <fieldset className="m-0 border-0 p-0">
+            <legend className="mb-2 text-[13px] font-semibold leading-5 text-[var(--fg-neutral)]">언제 만나요?</legend>
+            <div className="grid grid-cols-2 gap-2">
+              <TimeWheelPicker id="start" label="시작" value={values.start} options={timeOptions.filter((option) => option.offsetMinutes <= 24 * 60)} error={errors.start} onChange={(value) => updateValue("start", value)} />
+              <TimeWheelPicker id="end" label="종료" value={values.end} options={timeOptions} error={errors.end} onChange={(value) => updateValue("end", value)} />
             </div>
-          </div>
-          <ReviewInput
-            id="purpose"
-            label="목적"
-            value={values.purpose}
-            onChange={(value) => updateValue("purpose", value)}
-          />
-          <ReviewInput
-            id="time"
-            label="시간"
-            value={`${values.start}–${values.end}`}
-            onChange={(value) => {
-              const [start, end] = value.split("–");
-              updateValue("start", start?.trim() ?? value);
-              updateValue("end", end?.trim() ?? "");
-            }}
-          />
-          <ReviewInput
-            id="location"
-            label="장소"
-            value={values.location}
-            onChange={(value) => updateValue("location", value)}
-          />
-          <div className="grid min-h-[52px] grid-cols-[72px_minmax(0,1fr)] items-center gap-3 border-b border-[var(--stroke-neutral)]">
-            <span className="text-[length:var(--type-body)] leading-5 text-[var(--fg-muted)]">인원</span>
-            <div className="flex min-w-0 items-center gap-2">
-              <input
-                className="min-h-[44px] min-w-0 flex-1 bg-transparent text-right text-[length:var(--type-title)] font-semibold leading-5 text-[var(--fg-neutral)] outline-none focus-visible:rounded-[var(--dimension-x1)] focus-visible:ring-2 focus-visible:ring-[var(--fg-neutral)]"
-                aria-label="최소 성사 인원"
-                value={values.minimum}
-                onChange={(event) => updateValue("minimum", event.target.value)}
-              />
-              <span aria-hidden="true">·</span>
-              <input
-                className="min-h-[44px] min-w-0 flex-1 bg-transparent text-right text-[length:var(--type-title)] font-semibold leading-5 text-[var(--fg-neutral)] outline-none focus-visible:rounded-[var(--dimension-x1)] focus-visible:ring-2 focus-visible:ring-[var(--fg-neutral)]"
-                aria-label="정원"
-                value={values.capacity}
-                onChange={(event) => updateValue("capacity", event.target.value)}
-              />
+          </fieldset>
+
+          <PlacePicker id="place" label="장소" value={values.place} error={errors.place} onChange={(place) => updateValue("place", place)} />
+
+          <fieldset className="m-0 border-0 p-0">
+            <legend className="mb-2 text-[13px] font-semibold leading-5 text-[var(--fg-neutral)]">몇 명이 모이면 시작할까요?</legend>
+            <div className="grid grid-cols-2 gap-2">
+              <NumberField id="minimum" label="최소 성사 인원" value={values.minimum} error={errors.minimum} onChange={(value) => updateValue("minimum", value)} />
+              <NumberField id="capacity" label="정원" value={values.capacity} error={errors.capacity} onChange={(value) => updateValue("capacity", value)} />
             </div>
-          </div>
-          <ReviewInput
-            id="costAlcohol"
-            label="비용·음주"
-            value={values.costAlcohol}
-            onChange={(value) => updateValue("costAlcohol", value)}
-          />
-          <ReviewInput
-            id="deadline"
-            label="확정 마감"
-            value={values.deadline}
-            onChange={(value) => updateValue("deadline", value)}
-          />
+          </fieldset>
+
+          <TextField id="costAlcohol" label="비용·음주" value={values.costAlcohol} placeholder="예: 무료 · 음주 없음" onChange={(value) => updateValue("costAlcohol", value)} />
+
+          <TimeWheelPicker id="deadline" label="성사 여부를 확정할 시간" value={values.deadline} options={timeOptions} error={errors.deadline} onChange={(value) => updateValue("deadline", value)} />
         </div>
 
-        <StatusBanner
-          className="mt-3 rounded-[12px]"
-          tone="positive"
-          label="만들면 바로 첫 참가자 1명으로 시작해요."
-        />
+        <StatusBanner className="mt-4 rounded-[12px]" tone="positive" label="만들면 바로 첫 참가자 1명으로 시작해요." />
 
         <ul className="m-0 mt-4 list-none space-y-2 p-0 text-[length:var(--type-body)] leading-[22px] text-[var(--fg-muted)]">
           <li>· 생성 시점부터 24시간 안에 시작해요</li>

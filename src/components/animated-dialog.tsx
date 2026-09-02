@@ -34,7 +34,11 @@ export function AnimatedDialog({
   const contentPosition =
     placement === "center"
       ? "fixed inset-5 m-auto h-fit max-h-[calc(100svh-40px)]"
-      : "fixed inset-x-5 bottom-[max(20px,env(safe-area-inset-bottom))] mx-auto max-h-[calc(100svh-40px)]";
+      : "fixed inset-x-0 bottom-0 mx-auto max-h-[calc(100svh-16px)]";
+  const contentShape =
+    placement === "center"
+      ? "w-[calc(100%-40px)] max-w-[350px] rounded-[16px] p-5"
+      : "w-full max-w-[var(--screen-product-width)] rounded-t-[24px] px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-3";
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -58,12 +62,18 @@ export function AnimatedDialog({
               onCloseAutoFocus={onCloseAutoFocus}
             >
               <motion.section
-                className={`${contentPosition} z-50 w-[calc(100%-40px)] max-w-[350px] overflow-y-auto rounded-[16px] bg-[var(--bg-layer-floating)] p-5 outline-none ${className ?? ""}`}
+                className={`${contentPosition} ${contentShape} z-50 overflow-y-auto bg-[var(--bg-layer-floating)] outline-none ${className ?? ""}`}
                 initial={reduceMotion ? false : { opacity: 0, y: placement === "bottom" ? 24 : 8, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={reduceMotion ? { opacity: 1 } : { opacity: 0, y: placement === "bottom" ? 16 : 6, scale: 0.98 }}
                 transition={reduceMotion ? { duration: 0 } : { duration: 0.18, ease: standardEase }}
               >
+                {placement === "bottom" ? (
+                  <span
+                    className="mx-auto mb-4 block h-1 w-12 shrink-0 rounded-full bg-[var(--stroke-neutral)]"
+                    aria-hidden="true"
+                  />
+                ) : null}
                 {children}
               </motion.section>
             </Dialog.Content>

@@ -57,6 +57,11 @@ describe("AnimatedDialog", () => {
     fireEvent.click(trigger);
 
     expect(screen.getByRole("dialog", { name: "확인할까요?" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "확인할까요?" })).toHaveClass(
+      "inset-x-0",
+      "bottom-0",
+      "rounded-t-[24px]",
+    );
     await waitFor(() => expect(screen.getByRole("button", { name: "닫기" })).toHaveFocus());
     fireEvent.click(screen.getByRole("button", { name: "닫기" }));
 

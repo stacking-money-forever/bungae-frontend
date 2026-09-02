@@ -54,7 +54,6 @@ function QuorumConfirmationDialog({
     <AnimatedDialog
       open={open}
       onOpenChange={onOpenChange}
-      placement="center"
       onExitComplete={onExitComplete}
       onCloseAutoFocus={(event) => event.preventDefault()}
     >

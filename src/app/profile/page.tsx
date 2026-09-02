@@ -223,7 +223,6 @@ export default function ProfilePage() {
             setLogoutRequested(false);
           }}
           onExitComplete={commitLogoutAfterExit}
-          placement="center"
           trigger={
             <ProfileRow
               icon={LogOut}
