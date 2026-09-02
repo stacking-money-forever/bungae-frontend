@@ -1,8 +1,18 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
-import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useRef, type ReactNode } from "react";
+import { animate, motion, useMotionValue, useReducedMotion } from "motion/react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
+
+import {
+  getGestureAxis,
+  isRootTabPath,
+  isSwipeGestureBlockedTarget,
+  shouldCommitHorizontalGesture,
+  TAB_GESTURE_EVENT,
+  type GestureAxis,
+  type TabGestureDetail,
+} from "./navigation-gestures";
 
 import {
   clearPendingNavigationIntent,
@@ -142,8 +152,19 @@ export function getIncomingVariants(reduceMotion: boolean | null) {
 
 export function PageTransition({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const reduceMotion = useReducedMotion();
+  const gestureX = useMotionValue(0);
+  const pageGestureRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    startedAt: number;
+    axis: GestureAxis;
+    deltaX: number;
+  } | null>(null);
+  const suppressClickRef = useRef(false);
   const intentRef = useRef<NavigationIntent>("push");
   const currentHistoryIndexRef = useRef<number | null>(null);
   const historyNavigationRef = useRef(false);
@@ -181,6 +202,114 @@ export function PageTransition({ children }: { children: ReactNode }) {
     pendingNavigationRoute !== routeTarget
       ? "push"
       : pendingNavigationIntent ?? liveHistoryTraversalIntent ?? intentRef.current;
+
+  useLayoutEffect(() => {
+    gestureX.set(0);
+  }, [gestureX, routeTarget]);
+
+  useEffect(() => {
+    function handleTabGesture(event: Event) {
+      const detail = (event as CustomEvent<TabGestureDetail>).detail;
+      if (detail.phase === "update") {
+        gestureX.set(detail.x);
+        return;
+      }
+
+      if (detail.phase === "cancel") {
+        if (reduceMotion) {
+          gestureX.set(0);
+        } else {
+          animate(gestureX, 0, { duration: 0.16, ease: standardEase });
+        }
+        return;
+      }
+
+      const navigate = () => {
+        setNavigationIntent("tab", detail.target);
+        router.push(detail.target);
+      };
+      if (reduceMotion) {
+        gestureX.set(0);
+        navigate();
+        return;
+      }
+
+      const width = Math.min(window.innerWidth, 390);
+      animate(gestureX, detail.direction * -width, {
+        duration: 0.18,
+        ease: standardEase,
+      }).then(navigate);
+    }
+
+    window.addEventListener(TAB_GESTURE_EVENT, handleTabGesture);
+    return () => window.removeEventListener(TAB_GESTURE_EVENT, handleTabGesture);
+  }, [gestureX, reduceMotion, router]);
+
+  const finishPageGesture = (pointerId: number, cancelled = false, clientX?: number) => {
+    const gesture = pageGestureRef.current;
+    if (!gesture || gesture.pointerId !== pointerId) return;
+    if (!cancelled && typeof clientX === "number") {
+      gesture.deltaX = clientX - gesture.startX;
+    }
+    pageGestureRef.current = null;
+    suppressClickRef.current = !cancelled && Math.abs(gesture.deltaX) >= 8;
+
+    const shouldGoBack =
+      !cancelled &&
+      gesture.axis === "horizontal" &&
+      gesture.deltaX > 0 &&
+      shouldCommitHorizontalGesture(gesture.deltaX, performance.now() - gesture.startedAt);
+
+    if (!shouldGoBack) {
+      if (reduceMotion) {
+        gestureX.set(0);
+      } else {
+        animate(gestureX, 0, { duration: 0.16, ease: standardEase });
+      }
+      return;
+    }
+
+    const navigateBack = () => {
+      setNavigationIntent("pop");
+      router.back();
+    };
+    if (reduceMotion) {
+      gestureX.set(0);
+      navigateBack();
+    } else {
+      animate(gestureX, Math.min(window.innerWidth, 390), {
+        duration: 0.18,
+        ease: standardEase,
+      }).then(navigateBack);
+    }
+  };
+
+  useEffect(() => {
+    const handlePointerMove = (event: PointerEvent) => {
+      const gesture = pageGestureRef.current;
+      if (!gesture || gesture.pointerId !== event.pointerId) return;
+      const deltaX = event.clientX - gesture.startX;
+      const deltaY = event.clientY - gesture.startY;
+      gesture.deltaX = deltaX;
+      if (gesture.axis === "pending") {
+        gesture.axis = getGestureAxis(deltaX, deltaY);
+      }
+      if (gesture.axis === "horizontal" && deltaX > 0) {
+        gestureX.set(deltaX * 0.86);
+      }
+    };
+    const handlePointerUp = (event: PointerEvent) => finishPageGesture(event.pointerId, false, event.clientX);
+    const handlePointerCancel = (event: PointerEvent) => finishPageGesture(event.pointerId, true, event.clientX);
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerCancel);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerCancel);
+    };
+  });
 
   useEffect(() => {
     currentHistoryIndexRef.current = getInitialHistoryEntryIndex();
@@ -387,15 +516,44 @@ export function PageTransition({ children }: { children: ReactNode }) {
   return (
     <div className="route-stage">
       <motion.div
-        key={routeTarget}
-        className="route-transition"
-        data-navigation-intent={requestedIntent}
-        custom={requestedIntent}
-        variants={incomingVariants}
-        initial={isInitialRender ? false : "initial"}
-        animate="animate"
+        className="route-gesture-surface"
+        style={{ x: gestureX }}
+        onClickCapture={(event) => {
+          if (!suppressClickRef.current) return;
+          suppressClickRef.current = false;
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+        onPointerDown={(event) => {
+          if (
+            !event.isPrimary ||
+            event.button !== 0 ||
+            isRootTabPath(pathname) ||
+            isSwipeGestureBlockedTarget(event.target)
+          ) {
+            return;
+          }
+          pageGestureRef.current = {
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+            startedAt: performance.now(),
+            axis: "pending",
+            deltaX: 0,
+          };
+        }}
       >
-        {children}
+        <motion.div
+          key={routeTarget}
+          className="route-transition"
+          data-navigation-intent={requestedIntent}
+          custom={requestedIntent}
+          variants={incomingVariants}
+          initial={isInitialRender ? false : "initial"}
+          animate="animate"
+        >
+          {children}
+        </motion.div>
       </motion.div>
     </div>
   );

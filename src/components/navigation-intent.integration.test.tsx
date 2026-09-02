@@ -3,10 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const usePathname = vi.hoisted(() => vi.fn());
 const useSearchParams = vi.hoisted(() => vi.fn());
+const routerPush = vi.hoisted(() => vi.fn());
+const routerBack = vi.hoisted(() => vi.fn());
 
 vi.mock("next/navigation", () => ({
   usePathname: () => usePathname(),
   useSearchParams: () => useSearchParams(),
+  useRouter: () => ({ push: routerPush, back: routerBack }),
 }));
 
 vi.mock("next/link", () => ({
@@ -52,6 +55,8 @@ describe("NavigationLink and PageTransition", () => {
   beforeEach(() => {
     usePathname.mockImplementation(() => window.location.pathname);
     useSearchParams.mockImplementation(() => new URLSearchParams(window.location.search));
+    routerPush.mockReset();
+    routerBack.mockReset();
     window.history.replaceState({}, "", "/");
   });
 

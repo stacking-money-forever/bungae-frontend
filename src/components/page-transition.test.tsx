@@ -12,15 +12,20 @@ import { NavigationLink } from "./navigation-link";
 
 const usePathname = vi.fn();
 const useSearchParams = vi.fn();
+const routerPush = vi.fn();
+const routerBack = vi.fn();
 
 vi.mock("next/navigation", () => ({
   usePathname: () => usePathname(),
   useSearchParams: () => useSearchParams(),
+  useRouter: () => ({ push: routerPush, back: routerBack }),
 }));
 
 describe("PageTransition", () => {
   beforeEach(() => {
     usePathname.mockReturnValue("/");
+    routerPush.mockReset();
+    routerBack.mockReset();
     useSearchParams.mockImplementation(() => new URLSearchParams(window.location.search));
     window.history.replaceState({}, "", "/");
   });
@@ -613,6 +618,23 @@ describe("PageTransition", () => {
     expect(container.querySelectorAll(".route-transition")).toHaveLength(1);
     expect(screen.getByText("상세 화면")).toBeInTheDocument();
     expect(screen.queryByText("현재 화면")).not.toBeInTheDocument();
+  });
+
+  it("navigates back after a committed right swipe on a pushed route", async () => {
+    usePathname.mockReturnValue("/meetups/demo");
+    const { container } = render(
+      <PageTransition>
+        <p>상세 화면</p>
+      </PageTransition>,
+    );
+    const surface = container.querySelector(".route-gesture-surface");
+    expect(surface).not.toBeNull();
+
+    fireEvent.pointerDown(surface!, { pointerId: 7, button: 0, isPrimary: true, clientX: 40, clientY: 120 });
+    fireEvent.pointerMove(surface!, { pointerId: 7, isPrimary: true, clientX: 170, clientY: 125 });
+    fireEvent.pointerUp(surface!, { pointerId: 7, button: 0, isPrimary: true, clientX: 170, clientY: 125 });
+
+    await waitFor(() => expect(routerBack).toHaveBeenCalledTimes(1));
   });
 
   it("resolves intents from internal anchor semantics", () => {

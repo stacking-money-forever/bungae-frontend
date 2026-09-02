@@ -14,7 +14,7 @@ export function ScreenShell({
   ...rest
 }: ScreenShellProps) {
   const shellClassName = [
-    "relative mx-auto flex min-h-[100svh] w-full max-w-[var(--screen-product-width)] flex-col overflow-x-hidden bg-[var(--bg-layer-default)] text-[var(--fg-neutral)]",
+    "relative mx-auto flex min-h-[100svh] w-full max-w-[var(--screen-product-width)] flex-col overflow-x-clip bg-[var(--bg-layer-default)] text-[var(--fg-neutral)]",
     bottomSpacing
       ? "pb-[calc(var(--action-primary-height)+var(--dimension-x3)+var(--dimension-x6))]"
       : undefined,

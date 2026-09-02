@@ -17,11 +17,12 @@ import { PersistentBottomNavigation } from "@/components/persistent-bottom-navig
 
 const usePathname = vi.hoisted(() => vi.fn());
 const routerPush = vi.hoisted(() => vi.fn());
+const routerBack = vi.hoisted(() => vi.fn());
 
 vi.mock("next/navigation", () => ({
   usePathname: () => usePathname(),
   useSearchParams: () => new URLSearchParams(window.location.search),
-  useRouter: () => ({ push: routerPush }),
+  useRouter: () => ({ push: routerPush, back: routerBack }),
 }));
 
 function ReducedMotionProbe() {
@@ -47,6 +48,7 @@ describe("reduced motion integration", () => {
 
   beforeEach(() => {
     routerPush.mockReset();
+    routerBack.mockReset();
     usePathname.mockReturnValue("/");
     window.history.replaceState({}, "", "/");
   });

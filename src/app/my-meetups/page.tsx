@@ -142,7 +142,7 @@ export default function MyMeetupsPage() {
   return (
     <main className="app-viewport">
       <div className="home-shell">
-        <header className="flex min-h-[76px] shrink-0 items-end px-5 pb-4 pt-6">
+        <header className="root-tab-header flex min-h-[76px] shrink-0 items-center px-5">
           <h1 className="font-display m-0 text-[length:var(--type-page-title)] font-normal leading-6 text-[var(--fg-neutral)]">
             내 모임
           </h1>

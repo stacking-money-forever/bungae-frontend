@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   AlertTriangle,
   Check,
+  CheckCheck,
   ChevronRight,
   MessageCircle,
   Megaphone,
@@ -97,7 +98,7 @@ export default function NotificationsPage() {
   return (
     <main className="app-viewport">
       <div className="home-shell">
-        <header className="flex min-h-[92px] shrink-0 items-start justify-between px-5 pt-7">
+        <header className="root-tab-header flex min-h-[76px] shrink-0 items-center justify-between px-5">
           <h1
             className="font-display m-0 text-[length:var(--type-page-title)] font-normal leading-6 tracking-[-0.04em] text-[var(--fg-neutral)]"
           >
@@ -105,12 +106,15 @@ export default function NotificationsPage() {
           </h1>
           <button
             type="button"
-            className="mt-1 inline-flex min-h-[44px] items-center px-1 text-[length:var(--type-action)] leading-6 text-[var(--fg-neutral)] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2 disabled:cursor-default disabled:text-[var(--fg-muted)] disabled:no-underline"
+            className="group inline-flex min-h-[44px] items-center px-1 text-[var(--fg-neutral)] focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2 disabled:cursor-default disabled:text-[var(--fg-muted)]"
             onClick={markAllAsRead}
             disabled={unreadCount === 0}
             aria-label={unreadCount === 0 ? "모든 알림을 읽었어요" : "모든 알림 읽기"}
           >
-            모두 읽기
+            <span className="root-header-action__surface group-disabled:bg-transparent">
+              <CheckCheck size={14} strokeWidth={1.8} aria-hidden="true" />
+              모두 읽기
+            </span>
           </button>
         </header>
 

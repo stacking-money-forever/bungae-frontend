@@ -1,14 +1,20 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import { ChevronDown, ChevronRight, RotateCcw, Timer, Zap } from "lucide-react";
+import { ChevronRight, RotateCcw } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useRef, useState } from "react";
 
+import {
+  defaultHomeFilters,
+  filterMeetupGroups,
+  HomeSurface,
+  meetupGroups,
+  readFiltersFromSearch,
+  serializeHomeFilters,
+} from "@/components/home-surface";
 import { setNavigationIntent } from "@/components/navigation-intent";
-import { ScreenShell } from "@/components/screen-shell";
 
 type SelectOption = {
   label: string;
@@ -24,9 +30,10 @@ const activityOptions: SelectOption[] = [
 ];
 
 const timeOptions: SelectOption[] = [
-  { label: "오늘", value: "오늘" },
-  { label: "지금부터 3시간", value: "지금부터 3시간" },
-  { label: "내일", value: "내일" },
+  { label: "24시간", value: "24시간" },
+  { label: "오늘 저녁", value: "오늘 저녁" },
+  { label: "오늘 밤", value: "오늘 밤" },
+  { label: "내일 오전", value: "내일 오전" },
 ];
 
 const distanceOptions: SelectOption[] = [
@@ -90,64 +97,52 @@ function FilterSelectRow({
   );
 }
 
-export default function FiltersPage() {
+function FiltersPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const reduceMotion = useReducedMotion();
-  const [activity, setActivity] = useState("전체");
-  const [time, setTime] = useState("오늘");
-  const [distance, setDistance] = useState("2km 이내");
-  const [costAlcohol, setCostAlcohol] = useState("무료 · 음주 없음");
-  const [availableOnly, setAvailableOnly] = useState(true);
+  const [initialFilters] = useState(() => readFiltersFromSearch(searchParams));
+  const [activity, setActivity] = useState(initialFilters.activity);
+  const [time, setTime] = useState(initialFilters.time);
+  const [distance, setDistance] = useState(initialFilters.distance);
+  const [costAlcohol, setCostAlcohol] = useState(initialFilters.costAlcohol);
+  const [availableOnly, setAvailableOnly] = useState(initialFilters.availableOnly);
   const [isSheetOpen, setIsSheetOpen] = useState(true);
   const filterHeadingRef = useRef<HTMLHeadingElement>(null);
 
   const resetFilters = () => {
-    setActivity("전체");
-    setTime("오늘");
-    setDistance("2km 이내");
-    setCostAlcohol("무료 · 음주 없음");
-    setAvailableOnly(true);
+    setActivity(defaultHomeFilters.activity);
+    setTime(defaultHomeFilters.time);
+    setDistance(defaultHomeFilters.distance);
+    setCostAlcohol(defaultHomeFilters.costAlcohol);
+    setAvailableOnly(defaultHomeFilters.availableOnly);
   };
 
   const closeSheet = () => {
     setIsSheetOpen(false);
   };
 
-  const navigateHome = () => {
-    setNavigationIntent("sheet", "/");
-    router.push("/");
-  };
+  const filters = { activity, time, distance, costAlcohol, availableOnly };
+  const resultCount = filterMeetupGroups(meetupGroups, filters).reduce(
+    (total, group) => total + group.meetups.length,
+    0,
+  );
+  const serializedQuery = serializeHomeFilters(filters);
+  const homeTarget = serializedQuery ? `/?${serializedQuery}` : "/";
 
-  const resultCount = availableOnly ? 3 : 4;
+  const navigateHome = () => {
+    setNavigationIntent("sheet", homeTarget);
+    router.push(homeTarget);
+  };
 
   return (
     <Dialog.Root open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-      <ScreenShell aria-label="모임 필터">
       <div
         aria-hidden={isSheetOpen ? true : undefined}
         inert={isSheetOpen}
-        className="min-h-[280px] px-[var(--dimension-x5)] pt-6 opacity-70"
+        data-testid="filter-home-surface"
       >
-        <div className="flex items-center justify-between">
-          <Link className="flex min-h-[44px] items-center gap-2" href="/">
-            <span className="flex size-10 items-center justify-center rounded-[var(--dimension-x2)] bg-[var(--brand-accent)] text-[var(--fg-on-brand)]">
-              <Zap size={22} strokeWidth={2.2} />
-            </span>
-            <span className="font-display text-[length:var(--type-wordmark)] leading-6">벙개</span>
-          </Link>
-          <span className="flex size-11 items-center justify-center text-[var(--fg-muted)]">
-            <ChevronDown size={22} strokeWidth={1.8} />
-          </span>
-        </div>
-        <p className="mt-3 font-display text-[length:var(--type-page-title)] leading-6">마포구 망원동</p>
-        <div className="mt-2 flex min-h-[44px] items-center justify-between border-b border-[var(--stroke-neutral)] text-[length:var(--type-body)] leading-[22px]">
-          <span>오늘 · 2km · 무료</span>
-          <span className="text-[var(--fg-muted)]">필터 변경</span>
-        </div>
-        <div className="mt-5 flex min-h-[64px] items-center gap-3 border-b border-[var(--stroke-neutral)]">
-          <Timer size={24} strokeWidth={1.8} />
-          <span className="text-[length:var(--type-body)] leading-[22px]">가장 빠른 모임은 18:30에 시작해요</span>
-        </div>
+        <HomeSurface filters={filters} />
       </div>
 
       <Dialog.Portal forceMount>
@@ -300,7 +295,14 @@ export default function FiltersPage() {
           ) : null}
         </AnimatePresence>
       </Dialog.Portal>
-      </ScreenShell>
     </Dialog.Root>
+  );
+}
+
+export default function FiltersPage() {
+  return (
+    <Suspense fallback={<HomeSurface filters={defaultHomeFilters} />}>
+      <FiltersPageContent />
+    </Suspense>
   );
 }
