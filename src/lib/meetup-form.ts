@@ -11,13 +11,17 @@ export interface CreateFormValues {
   minimum: string;
   capacity: string;
   costAlcohol: string;
+  preparation: string;
+  facilitationTemplate: string;
   deadline: string;
 }
 
 export type CreateFormErrors = Partial<
-  Record<"title" | "start" | "end" | "place" | "minimum" | "capacity" | "deadline", string>
+  Record<
+    "title" | "start" | "end" | "place" | "minimum" | "capacity" | "costAlcohol" | "facilitationTemplate" | "deadline",
+    string
+  >
 >;
-
 export function createTimeOptions(now = new Date()): TimeWheelOption[] {
   const sourceDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const intervalMs = 30 * 60_000;
@@ -39,6 +43,7 @@ export function createTimeOptions(now = new Date()): TimeWheelOption[] {
       value: `offset-${offsetMinutes}`,
       label: `${dayLabel} ${String(optionDate.getHours()).padStart(2, "0")}:${String(optionDate.getMinutes()).padStart(2, "0")}`,
       offsetMinutes,
+      instant: optionDate.toISOString(),
     };
   });
 }
@@ -62,6 +67,8 @@ export const initialValues: CreateFormValues = {
   minimum: "3",
   capacity: "6",
   costAlcohol: "무료 · 음주 없음",
+  preparation: "",
+  facilitationTemplate: "자유 진행",
   deadline: "offset-90",
 };
 
@@ -100,6 +107,9 @@ export function validateMeetupForm(values: CreateFormValues): CreateFormErrors {
   }
   if (!Number.isInteger(capacity) || capacity > 8 || capacity < minimum) {
     errors.capacity = "정원은 최소 인원 이상, 최대 8명이어야 해요.";
+  }
+  if (!values.facilitationTemplate.trim()) {
+    errors.facilitationTemplate = "진행 방식을 입력해 주세요.";
   }
 
   return errors;

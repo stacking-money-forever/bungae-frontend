@@ -7,6 +7,7 @@ import {
   AnimatedDialogClose,
   AnimatedDialogDescription,
   AnimatedDialogTitle,
+  getDialogMotionStates,
 } from "./animated-dialog";
 
 function DialogFixture() {
@@ -50,6 +51,14 @@ function DialogFixtureWithExitSpy({ onExitComplete }: { onExitComplete: () => vo
 }
 
 describe("AnimatedDialog", () => {
+  it("slides bottom sheets through the full sheet height without scaling", () => {
+    const states = getDialogMotionStates("bottom", false);
+
+    expect(states.initial).toEqual({ opacity: 1, y: "100%", scale: 1 });
+    expect(states.exit).toEqual({ opacity: 1, y: "100%", scale: 1 });
+    expect(states.transition).toMatchObject({ type: "tween", duration: 0.28 });
+  });
+
   it("opens with an accessible dialog boundary and restores the trigger on close", async () => {
     render(<DialogFixture />);
 

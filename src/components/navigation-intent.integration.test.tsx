@@ -67,7 +67,7 @@ describe("NavigationLink and PageTransition", () => {
   ] as const)(
     "commits the %s intent when the router renders before the address bar update",
     async (intent, destination, label) => {
-      const source = destination === "/" ? "/my-meetups" : "/";
+      const source = "/source";
       window.history.replaceState({}, "", source);
       usePathname.mockReturnValue(source);
 

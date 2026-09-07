@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Ban,
   CircleCheck,
   Flag,
   LockKeyhole,
@@ -11,7 +10,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
 import {
   AnimatedDialog,
@@ -20,16 +19,15 @@ import {
   AnimatedDialogTitle,
 } from "@/components/animated-dialog";
 import { BottomActionBar } from "@/components/bottom-action-bar";
+import { OfflineNotice } from "@/components/offline-notice";
 import { ScreenShell } from "@/components/screen-shell";
 import { TopNavigation } from "@/components/top-navigation";
+import { ApiProblemError } from "@/lib/api/client";
+import type { JoinResult, Meetup } from "@/lib/api/types";
+import { useOptionalAuthSession } from "@/lib/auth/auth-session-provider";
+import { SessionExpiredError } from "@/lib/auth/session-store";
+import { useOnlineStatus } from "@/lib/ui/online";
 
-const meetupDetails = [
-  { label: "시간", value: "오늘 18:30–20:00" },
-  { label: "인원", value: "현재 2명 · 최소 3명 · 정원 6명" },
-  { label: "비용", value: "무료" },
-  { label: "음주", value: "없음" },
-  { label: "진행", value: "20분 산책 후 카페 선택" },
-];
 
 const reportReasons = [
   ["unsafe", "안전 위협"],
@@ -44,146 +42,337 @@ const reportReasons = [
 
 export default function MeetupDetailPage() {
   const params = useParams<{ meetupId: string }>();
-  const meetupId = typeof params.meetupId === "string" ? params.meetupId : "han-river-walk";
+  const meetupId = typeof params.meetupId === "string" ? params.meetupId : "";
   const encodedMeetupId = encodeURIComponent(meetupId);
+  const auth = useOptionalAuthSession();
+  const subject = auth?.snapshot.status === "authenticated" ? auth.snapshot.user.id : null;
+  const sessionEpoch = auth?.sessionEpoch ?? 0;
+  const online = useOnlineStatus();
+  const subjectRef = useRef(subject);
+  subjectRef.current = subject;
+  const epochRef = useRef(sessionEpoch);
+  epochRef.current = sessionEpoch;
+  const meetupIdRef = useRef(meetupId);
+  meetupIdRef.current = meetupId;
+  const meetupRequest = useRef(0);
+  const [meetupState, setMeetupState] = useState<{
+    subject: string | null;
+    epoch: number;
+    meetupId: string;
+    status: "idle" | "loading" | "ready" | "error";
+    meetup: Meetup | null;
+    error: string | null;
+  }>({ subject: null, epoch: 0, meetupId: "", status: "idle", meetup: null, error: null });
+  const detailStateMatchesRouteAndSession =
+    meetupState.subject === subject &&
+    meetupState.epoch === sessionEpoch &&
+    meetupState.meetupId === meetupId;
+  const currentMeetup = detailStateMatchesRouteAndSession ? meetupState.meetup : null;
+  const authenticatedDetailLoading =
+    subject !== null &&
+    (!detailStateMatchesRouteAndSession ||
+      meetupState.status === "idle" ||
+      meetupState.status === "loading" ||
+      (meetupState.status === "ready" && currentMeetup === null));
+  const authenticatedDetailError =
+    subject !== null && detailStateMatchesRouteAndSession && meetupState.status === "error";
+
+  const loadMeetup = useCallback(async () => {
+    if (!subject || !auth) return;
+    const request = ++meetupRequest.current;
+    setMeetupState({ subject, epoch: sessionEpoch, meetupId, status: "loading", meetup: null, error: null });
+    try {
+      const meetup = await auth.getMeetup(meetupId);
+      if (meetupRequest.current !== request || subjectRef.current !== subject || epochRef.current !== sessionEpoch) return;
+      setMeetupState({ subject, epoch: sessionEpoch, meetupId, status: "ready", meetup, error: null });
+    } catch (error) {
+      if (meetupRequest.current !== request || subjectRef.current !== subject || epochRef.current !== sessionEpoch || error instanceof SessionExpiredError) return;
+      setMeetupState({
+        subject,
+        epoch: sessionEpoch,
+        meetupId,
+        status: "error",
+        meetup: null,
+        error: error instanceof ApiProblemError ? error.problem?.detail ?? "모임을 불러오지 못했어요." : "모임을 불러오지 못했어요.",
+      });
+    }
+  }, [auth, meetupId, sessionEpoch, subject]);
+
+  useEffect(() => {
+    meetupRequest.current += 1;
+    if (!subject) {
+      setMeetupState({ subject: null, epoch: 0, meetupId: "", status: "idle", meetup: null, error: null });
+      return;
+    }
+    void loadMeetup();
+    return () => {
+      meetupRequest.current += 1;
+    };
+  }, [loadMeetup, subject]);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [reportDetail, setReportDetail] = useState("");
   const [urgentReport, setUrgentReport] = useState(false);
   const [reported, setReported] = useState(false);
-  const [blockOpen, setBlockOpen] = useState(false);
-  const [blocked, setBlocked] = useState(false);
+  const [reportPending, setReportPending] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const reportAttemptRef = useRef<{ identity: string; payload: string; idempotencyKey: string; inFlight: boolean } | null>(null);
   const reportTriggerRef = useRef<HTMLButtonElement>(null);
-  const blockTriggerRef = useRef<HTMLButtonElement>(null);
-  const reportCommitRequested = useRef(false);
-  const blockCommitRequested = useRef(false);
   const reportWasOpened = useRef(false);
-  const blockWasOpened = useRef(false);
+  const detailLocalIdentity = `${sessionEpoch}:${subject ?? "anonymous"}:${meetupId}`;
+  const [detailLocalStateIdentity, setDetailLocalStateIdentity] = useState(detailLocalIdentity);
+  const detailLocalStateIsCurrent = detailLocalStateIdentity === detailLocalIdentity;
+  const activeReportOpen = detailLocalStateIsCurrent && reportOpen;
+  const activeReported = detailLocalStateIsCurrent && reported;
+  const [joinState, setJoinState] = useState<{
+    identity: string;
+    status: "idle" | "pending" | "error" | "done";
+    result: JoinResult | null;
+    error: string | null;
+  }>({ identity: "", status: "idle", result: null, error: null });
+  const [leaveState, setLeaveState] = useState<{
+    identity: string;
+    status: "idle" | "pending" | "error" | "done";
+    error: string | null;
+  }>({ identity: "", status: "idle", error: null });
+  const joinAttemptRef = useRef<{ identity: string; idempotencyKey: string; inFlight: Promise<JoinResult> | null } | null>(null);
+  const leaveAttemptRef = useRef<{ identity: string; inFlight: Promise<void> | null } | null>(null);
+  const activeJoinState = joinState.identity === detailLocalIdentity ? joinState : { identity: detailLocalIdentity, status: "idle" as const, result: null, error: null };
+  const activeLeaveState = leaveState.identity === detailLocalIdentity ? leaveState : { identity: detailLocalIdentity, status: "idle" as const, error: null };
 
   useEffect(() => {
-    if (reported) {
+    if (detailLocalStateIdentity === detailLocalIdentity) return;
+
+    setReportOpen(false);
+    setReportReason("");
+    setReportDetail("");
+    setUrgentReport(false);
+    setReported(false);
+    setReportPending(false);
+    setReportError(null);
+    reportAttemptRef.current = null;
+    joinAttemptRef.current = null;
+    leaveAttemptRef.current = null;
+    setJoinState({ identity: detailLocalIdentity, status: "idle", result: null, error: null });
+    setLeaveState({ identity: detailLocalIdentity, status: "idle", error: null });
+    setDetailLocalStateIdentity(detailLocalIdentity);
+  }, [detailLocalIdentity, detailLocalStateIdentity]);
+  useEffect(() => {
+    if (activeReported) {
       document.getElementById("meetup-report-receipt")?.focus();
     }
-  }, [reported]);
+  }, [activeReported]);
 
-  useEffect(() => {
-    if (blocked) {
-      document.getElementById("meetup-blocked-result")?.focus();
-    }
-  }, [blocked]);
 
   function openReportDialog() {
+    if (!detailLocalStateIsCurrent) return;
     reportWasOpened.current = true;
     setReportOpen(true);
   }
 
   function handleReportOpenChange(open: boolean) {
+    if (!detailLocalStateIsCurrent) return;
     if (open) reportWasOpened.current = true;
     setReportOpen(open);
   }
 
-  function handleReportSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleReportSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!reportReason || reportCommitRequested.current) return;
-
-    reportCommitRequested.current = true;
-    setReportOpen(false);
+    if (!detailLocalStateIsCurrent || !auth || !subject || !reportReason || reportPending || !online) return;
+    const category = reportReason === "harassment" || reportReason === "sexual" ? "HARASSMENT" : reportReason === "unsafe" ? "SAFETY" : reportReason === "solicitation" || reportReason === "misleading" ? "FRAUD" : "OTHER";
+    const details = reportDetail.trim() || reportReasons.find(([value]) => value === reportReason)?.[1] || reportReason;
+    const payload = JSON.stringify({ category, urgency: urgentReport ? "P0" : "P1", details });
+    const attempt =
+      reportAttemptRef.current?.identity === detailLocalIdentity && reportAttemptRef.current.payload === payload
+        ? reportAttemptRef.current
+        : { identity: detailLocalIdentity, payload, idempotencyKey: crypto.randomUUID(), inFlight: false };
+    if (attempt.inFlight) return;
+    reportAttemptRef.current = attempt;
+    attempt.inFlight = true;
+    setReportPending(true);
+    setReportError(null);
+    try {
+      await auth.createReport(
+        {
+          targetType: "MEETUP",
+          meetupId,
+          category,
+          urgency: urgentReport ? "P0" : "P1",
+          details,
+          evidenceUploadIds: [],
+        },
+        attempt.idempotencyKey,
+      );
+      if (subjectRef.current !== subject || meetupIdRef.current !== meetupId) return;
+      reportAttemptRef.current = null;
+      reportWasOpened.current = false;
+      setReported(true);
+      setReportOpen(false);
+    } catch (error) {
+      if (subjectRef.current !== subject || meetupIdRef.current !== meetupId || error instanceof SessionExpiredError) return;
+      setReportError(error instanceof ApiProblemError ? error.problem?.detail ?? "신고를 접수하지 못했어요." : "신고를 접수하지 못했어요.");
+    } finally {
+      attempt.inFlight = false;
+      if (subjectRef.current === subject && meetupIdRef.current === meetupId) setReportPending(false);
+    }
   }
 
   function handleReportExitComplete() {
-    if (reportCommitRequested.current) {
-      reportCommitRequested.current = false;
-      reportWasOpened.current = false;
-      setReported(true);
-      return;
-    }
-
-    if (reportWasOpened.current) {
-      reportWasOpened.current = false;
-      reportTriggerRef.current?.focus();
-    }
+    if (!detailLocalStateIsCurrent || activeReported) return;
+    if (reportWasOpened.current) { reportWasOpened.current = false; reportTriggerRef.current?.focus(); }
   }
 
-  function openBlockDialog() {
-    blockWasOpened.current = true;
-    setBlockOpen(true);
-  }
 
-  function handleBlockOpenChange(open: boolean) {
-    if (open) blockWasOpened.current = true;
-    setBlockOpen(open);
-  }
-
-  function confirmBlock() {
-    if (!blockOpen || blockCommitRequested.current) return;
-
-    blockCommitRequested.current = true;
-    setBlockOpen(false);
-  }
-
-  function handleBlockExitComplete() {
-    if (blockCommitRequested.current) {
-      blockCommitRequested.current = false;
-      blockWasOpened.current = false;
-      setBlocked(true);
-      return;
-    }
-
-    if (blockWasOpened.current) {
-      blockWasOpened.current = false;
-      blockTriggerRef.current?.focus();
+  async function joinMeetup() {
+    if (!subject || !auth || !currentMeetup?.allowedActions.includes("JOIN") || !online) return;
+    const existing = joinAttemptRef.current?.identity === detailLocalIdentity
+      ? joinAttemptRef.current
+      : { identity: detailLocalIdentity, idempotencyKey: crypto.randomUUID(), inFlight: null };
+    joinAttemptRef.current = existing;
+    if (existing.inFlight) return;
+    setJoinState({ identity: detailLocalIdentity, status: "pending", result: null, error: null });
+    const request = auth.joinMeetup(meetupId, existing.idempotencyKey);
+    existing.inFlight = request;
+    try {
+      const result = await request;
+      if (subjectRef.current !== subject || meetupIdRef.current !== meetupId) return;
+      joinAttemptRef.current = null;
+      setJoinState({ identity: detailLocalIdentity, status: "done", result, error: null });
+      await loadMeetup();
+    } catch (error) {
+      if (subjectRef.current !== subject || meetupIdRef.current !== meetupId) return;
+      setJoinState({ identity: detailLocalIdentity, status: "error", result: null, error: error instanceof ApiProblemError ? error.problem?.detail ?? "참여를 처리하지 못했어요." : "참여를 처리하지 못했어요." });
+      await loadMeetup();
+    } finally {
+      if (joinAttemptRef.current === existing) existing.inFlight = null;
     }
   }
 
+  async function leaveMeetup() {
+    if (!subject || !auth || !currentMeetup?.allowedActions.includes("LEAVE") || !online) return;
+    const existing = leaveAttemptRef.current?.identity === detailLocalIdentity
+      ? leaveAttemptRef.current
+      : { identity: detailLocalIdentity, inFlight: null };
+    leaveAttemptRef.current = existing;
+    if (existing.inFlight) return;
+    setLeaveState({ identity: detailLocalIdentity, status: "pending", error: null });
+    const request = auth.leaveMeetup(meetupId);
+    existing.inFlight = request;
+    try {
+      await request;
+      if (subjectRef.current !== subject || meetupIdRef.current !== meetupId) return;
+      leaveAttemptRef.current = null;
+      setLeaveState({ identity: detailLocalIdentity, status: "done", error: null });
+      await loadMeetup();
+    } catch (error) {
+      if (subjectRef.current !== subject || meetupIdRef.current !== meetupId) return;
+      setLeaveState({ identity: detailLocalIdentity, status: "error", error: error instanceof ApiProblemError ? error.problem?.detail ?? "참여 취소를 처리하지 못했어요." : "참여 취소를 처리하지 못했어요." });
+      await loadMeetup();
+    } finally {
+      if (leaveAttemptRef.current === existing) existing.inFlight = null;
+    }
+  }
+
+  if (!subject) {
+    return (
+      <ScreenShell bottomSpacing aria-label="로그인 필요">
+        <TopNavigation href="/" title="모임 상세" />
+        <section className="px-[var(--dimension-x5)] pb-8 pt-12" aria-labelledby="meetup-auth-heading">
+          <h2 id="meetup-auth-heading" className="m-0 font-display text-[length:var(--type-headline)] font-normal leading-8 text-[var(--fg-neutral)]">
+            로그인하고 모임을 확인해 주세요
+          </h2>
+          <p className="m-0 mt-4 text-[length:var(--type-body)] leading-[22px] text-[var(--fg-muted)]">
+            모임 정보와 참여 가능 여부는 로그인한 계정의 최신 서버 상태에서만 표시해요.
+          </p>
+        </section>
+        <BottomActionBar>
+          <Link className="inline-flex min-h-[var(--action-primary-height)] w-full items-center justify-center rounded-[12px] bg-[var(--brand-accent)] px-4 text-[length:var(--type-action)] font-bold leading-6 text-[var(--fg-on-brand)]" href="/auth">
+            휴대전화로 로그인하기
+          </Link>
+        </BottomActionBar>
+      </ScreenShell>
+    );
+  }
+
+  const detailValues = currentMeetup
+    ? [
+        {
+          label: "시간",
+          value: `${new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(currentMeetup.startsAt))}–${new Intl.DateTimeFormat("ko-KR", { timeStyle: "short" }).format(new Date(currentMeetup.endsAt))}`,
+        },
+        { label: "인원", value: `현재 ${currentMeetup.joinedCount}명 · 최소 ${currentMeetup.minimumParticipants}명 · 정원 ${currentMeetup.capacity}명` },
+        { label: "비용", value: currentMeetup.cost === 0 ? "무료" : `${currentMeetup.cost.toLocaleString("ko-KR")}원` },
+        { label: "음주", value: currentMeetup.alcoholPolicy === "ALLOWED" ? "가능" : "없음" },
+        { label: "진행", value: currentMeetup.preparation || currentMeetup.facilitationTemplate || "서버에서 진행 정보를 제공하지 않았어요." },
+      ]
+    : [];
+  const meetupTitle = currentMeetup?.title ?? "";
+  const meetupDescription = currentMeetup?.description ?? "";
+  const meetupStatus = currentMeetup
+    ? currentMeetup.allowedActions.includes("JOIN")
+      ? "참여 가능한 모임이에요."
+      : `현재 상태: ${currentMeetup.state}`
+    : "";
+  const hasJoinAction = currentMeetup?.allowedActions.includes("JOIN") ?? false;
+  const hasLeaveAction = currentMeetup?.allowedActions.includes("LEAVE") ?? false;
+  const hasCancelAction = currentMeetup?.allowedActions.includes("CANCEL") ?? false;
+  const hasQuorumDecisionAction = currentMeetup?.allowedActions.includes("QUORUM_DECISION") ?? false;
+  const hasCheckInAction = currentMeetup?.allowedActions.includes("CHECK_IN") ?? false;
+  const authenticatedActionCount =
+    Number(hasJoinAction) +
+    Number(hasLeaveAction) +
+    Number(hasCancelAction) +
+    Number(hasQuorumDecisionAction) +
+    Number(hasCheckInAction);
+  const bottomActionCount = authenticatedActionCount;
+  const bottomActionSpacingClass =
+    bottomActionCount === 2
+      ? "pb-[calc((var(--action-primary-height)*2)+var(--dimension-x2)+var(--dimension-x3)+var(--dimension-x6))]"
+      : bottomActionCount === 3
+        ? "pb-[calc((var(--action-primary-height)*3)+(var(--dimension-x2)*2)+var(--dimension-x3)+var(--dimension-x6))]"
+        : bottomActionCount === 4
+          ? "pb-[calc((var(--action-primary-height)*4)+(var(--dimension-x2)*3)+var(--dimension-x3)+var(--dimension-x6))]"
+          : bottomActionCount === 5
+            ? "pb-[calc((var(--action-primary-height)*5)+(var(--dimension-x2)*4)+var(--dimension-x3)+var(--dimension-x6))]"
+            : undefined;
   return (
-    <ScreenShell bottomSpacing aria-label="모임 상세">
+    <ScreenShell
+      bottomSpacing={bottomActionCount === 1}
+      className={bottomActionSpacingClass}
+      aria-label="모임 상세"
+    >
       <TopNavigation
         href="/"
         title="모임 상세"
       />
 
-      {blocked ? (
-        <section
-          className="flex flex-1 flex-col items-center px-[var(--dimension-x5)] pt-28 text-center"
-          aria-labelledby="meetup-blocked-heading"
-          id="meetup-blocked-result"
-          tabIndex={-1}
-        >
-          <div
-            className="flex size-[72px] items-center justify-center rounded-full bg-[var(--bg-neutral-weak)] text-[var(--fg-muted)]"
-            aria-hidden="true"
-          >
-            <Ban size={30} strokeWidth={1.8} />
-          </div>
-          <h2
-            id="meetup-blocked-heading"
-            className="m-0 mt-5 font-display text-[length:var(--type-headline)] font-normal leading-8 text-[var(--fg-neutral)]"
-          >
-            제안자를 차단했어요
-          </h2>
-          <p className="m-0 mt-3 max-w-[320px] text-[length:var(--type-body)] leading-[22px] text-[var(--fg-muted)]">
-            차단 관계로 이 모임 정보와 참여 기능을 숨겼어요.
-          </p>
-        </section>
-      ) : (
+      <OfflineNotice className="mx-5 mt-5" />
+
+      {authenticatedDetailLoading ? <section className="px-[var(--dimension-x5)] pt-12 text-center" role="status">모임을 불러오는 중이에요.</section> : authenticatedDetailError ? <section className="grid gap-3 px-[var(--dimension-x5)] pt-12 text-center" role="alert"><p>{meetupState.error}</p><button type="button" onClick={() => void loadMeetup()} className="min-h-[44px] border border-[var(--stroke-neutral)] px-3">다시 시도</button></section> : (
         <div className="px-[var(--dimension-x5)] pb-8 pt-7">
           <section aria-labelledby="meetup-title">
           <h2
             id="meetup-title"
             className="m-0 font-display text-[length:var(--type-headline)] font-normal leading-8 text-[var(--fg-neutral)]"
           >
-            퇴근 후 한강 산책
+            {meetupTitle}
           </h2>
           <p className="m-0 mt-3 text-[length:var(--type-body)] leading-[22px] text-[var(--fg-muted)]">
-            망원에서 한강 따라 20분 걷고, 카페에서 잠깐 이야기 나눠요.
+            {meetupDescription}
           </p>
           <p className="m-0 mt-6 font-display text-[20px] font-normal leading-7 text-[var(--fg-neutral)]">
-            한 명 더 참여하면 모임이 확정돼요.
+            {meetupStatus}
           </p>
         </section>
+        {activeJoinState.status === "pending" ? <p className="mt-4 text-[length:var(--type-body)] text-[var(--fg-muted)]" role="status">참여를 처리하는 중이에요.</p> : null}
+        {activeJoinState.result ? <p className="mt-4 text-[length:var(--type-body)] text-[var(--fg-positive)]" role="status">{activeJoinState.result.state === "JOINED" ? "참여가 완료됐어요." : `대기 목록에 등록됐어요${activeJoinState.result.waitlistPosition ? ` (${activeJoinState.result.waitlistPosition}번째)` : ""}.`}</p> : null}
+        {activeJoinState.error ? <section className="mt-4" role="alert"><p>{activeJoinState.error}</p><button type="button" onClick={() => void joinMeetup()} className="min-h-[44px] focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2">같은 요청으로 다시 시도</button></section> : null}
+        {activeLeaveState.status === "pending" ? <p className="mt-4 text-[length:var(--type-body)] text-[var(--fg-muted)]" role="status">참여 취소를 처리하는 중이에요.</p> : null}
+        {activeLeaveState.status === "done" ? <p className="mt-4 text-[length:var(--type-body)] text-[var(--fg-positive)]" role="status">참여를 취소했어요. 서버 상태를 새로 확인했어요.</p> : null}
+        {activeLeaveState.error ? <section className="mt-4" role="alert"><p>{activeLeaveState.error}</p><button type="button" onClick={() => void leaveMeetup()} className="min-h-[44px] focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2">참여 취소 다시 시도</button></section> : null}
 
         <dl className="mt-6 border-y border-[var(--stroke-neutral)]">
-          {meetupDetails.map((detail) => (
+          {detailValues.map((detail) => (
             <div
               className="grid min-h-[46px] grid-cols-[52px_minmax(0,1fr)] items-center gap-3 border-b border-[var(--stroke-neutral)] last:border-b-0"
               key={detail.label}
@@ -210,7 +399,7 @@ export default function MeetupDetailPage() {
             aria-hidden="true"
           />
           <div className="min-w-0">
-            <p className="m-0 text-[length:var(--type-title)] font-bold leading-5">마포구 망원동</p>
+            <p className="m-0 text-[length:var(--type-title)] font-bold leading-5">공개 장소</p>
             <p className="m-0 mt-1 text-[length:var(--type-body)] leading-[22px] text-[var(--fg-muted)]">
               정확한 장소는 참여 확정 후 공개해요.
             </p>
@@ -266,24 +455,16 @@ export default function MeetupDetailPage() {
                 type="button"
                 onClick={openReportDialog}
                 aria-haspopup="dialog"
-                aria-expanded={reportOpen}
+                aria-expanded={activeReportOpen}
               >
                 <Flag size={19} strokeWidth={1.8} aria-hidden="true" />
                 신고하기
               </button>
-              <button
-                ref={blockTriggerRef}
-                className="flex min-h-[48px] items-center justify-center gap-2 rounded-[10px] border border-[var(--stroke-neutral)] bg-[var(--bg-layer-floating)] px-3 text-[length:var(--type-action)] font-semibold leading-6 text-[var(--fg-critical)] focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
-                type="button"
-                onClick={openBlockDialog}
-                aria-haspopup="dialog"
-                aria-expanded={blockOpen}
-              >
-                <Ban size={19} strokeWidth={1.8} aria-hidden="true" />
-                제안자 차단
-              </button>
+              <p className="m-0 flex min-h-[48px] items-center px-3 text-[length:var(--type-body)] leading-5 text-[var(--fg-muted)]">
+                제안자 계정 ID가 이 모임 계약에 없어 여기서 차단할 수 없어요.
+              </p>
             </div>
-            {reported ? (
+            {activeReported ? (
               <div
                 className="mt-4 flex items-start gap-2 rounded-[10px] bg-[var(--bg-neutral-weak)] px-3 py-3 text-left"
                 id="meetup-report-receipt"
@@ -302,7 +483,8 @@ export default function MeetupDetailPage() {
       )}
 
       <AnimatedDialog
-        open={reportOpen}
+        key={`report:${detailLocalIdentity}`}
+        open={activeReportOpen}
         onOpenChange={handleReportOpenChange}
         onExitComplete={handleReportExitComplete}
         onCloseAutoFocus={(event) => event.preventDefault()}
@@ -363,12 +545,13 @@ export default function MeetupDetailPage() {
             placeholder="상황을 알려 주세요."
           />
           <div className="mt-3 flex gap-2">
+          {reportError ? <p role="alert">{reportError}</p> : null}
             <button
               className="min-h-[48px] flex-1 rounded-[10px] bg-[var(--fg-critical)] px-4 text-[length:var(--type-action)] font-semibold leading-6 text-white disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
               type="submit"
-              disabled={!reportReason}
+              disabled={!reportReason || reportPending || !online}
             >
-              신고 내용 기록하기
+              {reportPending ? "신고 접수 중…" : "신고 내용 기록하기"}
             </button>
             <AnimatedDialogClose asChild>
               <button
@@ -382,48 +565,55 @@ export default function MeetupDetailPage() {
         </form>
       </AnimatedDialog>
 
-      <AnimatedDialog
-        open={blockOpen}
-        onOpenChange={handleBlockOpenChange}
-        onExitComplete={handleBlockExitComplete}
-        onCloseAutoFocus={(event) => event.preventDefault()}
-        className="border border-[var(--fg-critical)] bg-[var(--bg-critical-weak)]"
-      >
-        <AnimatedDialogTitle className="m-0 text-[length:var(--type-section)] font-semibold leading-6 text-[var(--fg-critical)]">
-          모임 제안자를 차단할까요?
-        </AnimatedDialogTitle>
-        <AnimatedDialogDescription className="m-0 mt-2 text-[length:var(--type-body)] leading-[22px] text-[var(--fg-neutral)]">
-          제안자를 차단하면 서로의 프로필·모임·연결이 숨겨지고, 이 모임에도 참여할 수 없어요.
-        </AnimatedDialogDescription>
-        <div className="mt-3 flex gap-2">
-          <button
-            className="min-h-[48px] flex-1 rounded-[10px] bg-[var(--fg-critical)] px-4 text-[length:var(--type-action)] font-semibold leading-6 text-white focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
-            type="button"
-            onClick={confirmBlock}
-          >
-            제안자 차단하기
-          </button>
-          <AnimatedDialogClose asChild>
-            <button
-              className="min-h-[48px] rounded-[10px] px-4 text-[length:var(--type-action)] leading-6 text-[var(--fg-muted)] focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
-              type="button"
-            >
-              취소
-            </button>
-          </AnimatedDialogClose>
-        </div>
-      </AnimatedDialog>
 
-      {blocked ? null : (
+      {authenticatedActionCount > 0 ? (
         <BottomActionBar>
-          <Link
-            className="inline-flex min-h-[var(--action-primary-height)] w-full items-center justify-center rounded-[12px] bg-[var(--brand-accent)] px-4 text-[length:var(--type-action)] font-bold leading-6 text-[var(--fg-on-brand)] focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
-            href={`/meetups/${encodedMeetupId}/join`}
-          >
-            이 모임에 참여하기
-          </Link>
+          {hasJoinAction ? (
+            <button
+              type="button"
+              onClick={() => void joinMeetup()}
+              disabled={activeJoinState.status === "pending" || !online}
+              className="inline-flex min-h-[var(--action-primary-height)] w-full items-center justify-center rounded-[12px] bg-[var(--brand-accent)] px-4 text-[length:var(--type-action)] font-bold leading-6 text-[var(--fg-on-brand)] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
+            >
+              {activeJoinState.status === "pending" ? "참여 처리 중…" : "이 모임에 참여하기"}
+            </button>
+          ) : null}
+          {hasLeaveAction ? (
+            <button
+              type="button"
+              onClick={() => void leaveMeetup()}
+              disabled={activeLeaveState.status === "pending" || !online}
+              className="inline-flex min-h-[var(--action-primary-height)] w-full items-center justify-center rounded-[12px] border border-[var(--stroke-neutral)] bg-[var(--bg-layer-floating)] px-4 text-[length:var(--type-action)] font-bold leading-6 text-[var(--fg-critical)] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
+            >
+              {activeLeaveState.status === "pending" ? "참여 취소 처리 중…" : "모임 참여 취소하기"}
+            </button>
+          ) : null}
+          {hasCancelAction ? (
+            <Link
+              className="inline-flex min-h-[var(--action-primary-height)] w-full items-center justify-center rounded-[12px] border border-[var(--stroke-neutral)] bg-[var(--bg-layer-floating)] px-4 text-[length:var(--type-action)] font-bold leading-6 text-[var(--fg-critical)] focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
+              href={`/meetups/${encodedMeetupId}/safety-cancel`}
+            >
+              안전을 위해 모임 취소하기
+            </Link>
+          ) : null}
+          {hasQuorumDecisionAction ? (
+            <Link
+              className="inline-flex min-h-[var(--action-primary-height)] w-full items-center justify-center rounded-[12px] border border-[var(--stroke-neutral)] bg-[var(--bg-layer-floating)] px-4 text-[length:var(--type-action)] font-bold leading-6 text-[var(--fg-neutral)] focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
+              href={`/meetups/${encodedMeetupId}/quorum-decision`}
+            >
+              인원 결정하기
+            </Link>
+          ) : null}
+          {hasCheckInAction ? (
+            <Link
+              className="inline-flex min-h-[var(--action-primary-height)] w-full items-center justify-center rounded-[12px] bg-[var(--brand-accent)] px-4 text-[length:var(--type-action)] font-bold leading-6 text-[var(--fg-on-brand)] focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
+              href={`/meetups/${encodedMeetupId}/check-in`}
+            >
+              체크인하기
+            </Link>
+          ) : null}
         </BottomActionBar>
-      )}
+      ) : null}
     </ScreenShell>
   );
 }

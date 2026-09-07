@@ -15,6 +15,7 @@ export interface TimeWheelOption {
   value: string;
   label: string;
   offsetMinutes: number;
+  instant?: string;
 }
 
 export interface TimeWheelPickerProps {

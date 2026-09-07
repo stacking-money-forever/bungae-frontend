@@ -23,11 +23,11 @@ vi.mock("next/navigation", () => ({
 
 describe("PageTransition", () => {
   beforeEach(() => {
-    usePathname.mockReturnValue("/");
+    usePathname.mockReturnValue("/test");
     routerPush.mockReset();
     routerBack.mockReset();
     useSearchParams.mockImplementation(() => new URLSearchParams(window.location.search));
-    window.history.replaceState({}, "", "/");
+    window.history.replaceState({}, "", "/test");
   });
 
   it("uses pop for history back and push for history forward", async () => {
@@ -476,6 +476,8 @@ describe("PageTransition", () => {
   });
 
   it("keeps hash entries native across actual back and forward events", async () => {
+    usePathname.mockReturnValue("/");
+    window.history.replaceState({}, "", "/");
     const { container, rerender } = render(
       <PageTransition>
         <p>홈</p>
@@ -617,12 +619,97 @@ describe("PageTransition", () => {
 
     expect(container.querySelectorAll(".route-transition")).toHaveLength(1);
     expect(screen.getByText("상세 화면")).toBeInTheDocument();
-    expect(screen.queryByText("현재 화면")).not.toBeInTheDocument();
+  });
+
+  it("does not retain the previous route DOM after a navigation", () => {
+    const { container, rerender } = render(
+      <PageTransition>
+        <p>현재 홈</p>
+      </PageTransition>,
+    );
+    expect(screen.getByText("현재 홈")).toBeInTheDocument();
+
+    usePathname.mockReturnValue("/meetups/demo");
+    window.history.pushState({}, "", "/meetups/demo");
+    rerender(
+      <PageTransition>
+        <p>상세 화면</p>
+      </PageTransition>,
+    );
+
+    expect(screen.getByText("상세 화면")).toBeInTheDocument();
+    expect(container.querySelector(".route-history-underlay")).not.toBeInTheDocument();
+    expect(container.querySelector(".root-tab-panel")).not.toBeInTheDocument();
+    expect(screen.queryByText("현재 홈")).not.toBeInTheDocument();
+  });
+
+  it("commits a tab gesture to the destination route", async () => {
+    usePathname.mockReturnValue("/");
+    window.history.replaceState({}, "", "/");
+    render(
+      <PageTransition>
+        <p>홈 화면</p>
+      </PageTransition>,
+    );
+
+    window.dispatchEvent(
+      new CustomEvent("bungae:tab-gesture", {
+        detail: { phase: "commit", direction: -1, target: "/my-meetups" },
+      }),
+    );
+
+    await waitFor(() => {
+      expect(routerPush).toHaveBeenCalledWith("/my-meetups");
+    });
+  });
+
+  it("ignores non-committing tab gesture updates and cancels", () => {
+    render(
+      <PageTransition>
+        <p>홈 화면</p>
+      </PageTransition>,
+    );
+
+    window.dispatchEvent(
+      new CustomEvent("bungae:tab-gesture", {
+        detail: { phase: "update", x: 120 },
+      }),
+    );
+    window.dispatchEvent(new CustomEvent("bungae:tab-gesture", { detail: { phase: "cancel" } }));
+
+    expect(routerPush).not.toHaveBeenCalled();
+  });
+
+  it("does not cache portal-backed sheet routes as swipe underlays", () => {
+    usePathname.mockReturnValue("/locations");
+    window.history.replaceState({}, "", "/locations");
+    const { container, rerender } = render(
+      <PageTransition>
+        <p>위치 시트</p>
+      </PageTransition>,
+    );
+
+    usePathname.mockReturnValue("/meetups/demo");
+    window.history.pushState({}, "", "/meetups/demo");
+    rerender(
+      <PageTransition>
+        <p>상세 화면</p>
+      </PageTransition>,
+    );
+
+    expect(container.querySelector(".route-history-underlay")).not.toBeInTheDocument();
   });
 
   it("navigates back after a committed right swipe on a pushed route", async () => {
+    const { container, rerender } = render(
+      <PageTransition>
+        <p>홈 화면</p>
+      </PageTransition>,
+    );
+
     usePathname.mockReturnValue("/meetups/demo");
-    const { container } = render(
+    window.history.pushState({}, "", "/meetups/demo");
+    rerender(
       <PageTransition>
         <p>상세 화면</p>
       </PageTransition>,
@@ -635,6 +722,52 @@ describe("PageTransition", () => {
     fireEvent.pointerUp(surface!, { pointerId: 7, button: 0, isPrimary: true, clientX: 170, clientY: 125 });
 
     await waitFor(() => expect(routerBack).toHaveBeenCalledTimes(1));
+  });
+
+  it("does not navigate back when an in-progress page swipe is cancelled", async () => {
+    vi.useFakeTimers();
+    try {
+      const { container, rerender } = render(
+        <PageTransition>
+          <p>홈 화면</p>
+        </PageTransition>,
+      );
+
+      usePathname.mockReturnValue("/meetups/demo");
+      window.history.pushState({}, "", "/meetups/demo");
+      rerender(
+        <PageTransition>
+          <p>상세 화면</p>
+        </PageTransition>,
+      );
+      const surface = container.querySelector(".route-gesture-surface");
+
+      fireEvent.pointerDown(surface!, { pointerId: 9, button: 0, isPrimary: true, clientX: 40, clientY: 120 });
+      fireEvent.pointerMove(window, { pointerId: 9, isPrimary: true, clientX: 170, clientY: 125 });
+      fireEvent.pointerCancel(window, { pointerId: 9, isPrimary: true, clientX: 170, clientY: 125 });
+
+      await vi.advanceTimersByTimeAsync(240);
+      expect(routerBack).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not start an interactive back swipe without a rendered previous route", () => {
+    usePathname.mockReturnValue("/meetups/demo");
+    window.history.replaceState({}, "", "/meetups/demo");
+    const { container } = render(
+      <PageTransition>
+        <p>직접 진입 상세</p>
+      </PageTransition>,
+    );
+    const surface = container.querySelector(".route-gesture-surface--foreground");
+
+    fireEvent.pointerDown(surface!, { pointerId: 8, button: 0, isPrimary: true, clientX: 40, clientY: 120 });
+    fireEvent.pointerMove(window, { pointerId: 8, isPrimary: true, clientX: 180, clientY: 125 });
+    fireEvent.pointerUp(window, { pointerId: 8, button: 0, isPrimary: true, clientX: 180, clientY: 125 });
+
+    expect(routerBack).not.toHaveBeenCalled();
   });
 
   it("resolves intents from internal anchor semantics", () => {

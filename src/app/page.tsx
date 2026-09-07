@@ -2,13 +2,21 @@ import { Suspense } from "react";
 
 import {
   defaultHomeFilters,
-  HomeSurface,
+  HomeChrome,
   HomeSurfaceFromSearch,
 } from "@/components/home-surface";
 
 export default function HomePage() {
   return (
-    <Suspense fallback={<HomeSurface filters={defaultHomeFilters} />}>
+    <Suspense
+      fallback={
+        <main className="app-viewport">
+          <div className="home-shell">
+            <HomeChrome filters={defaultHomeFilters} />
+          </div>
+        </main>
+      }
+    >
       <HomeSurfaceFromSearch />
     </Suspense>
   );

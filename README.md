@@ -30,6 +30,10 @@ npm run build
 
 최근 모바일 검증 범위와 남은 제한은 [QA 기록](artifacts/qa/QA_TRANSCRIPT.md)을 따릅니다.
 
+### 프런트엔드 no-API 실행 완료 증거 (2026-09-07)
+
+현재 snapshot(`e126c1fb`, base `cdf1328`)에서 프런트엔드 표현·복구·접근성·검증(API/백엔드 연동 제외) 완료 상태다. 실행 체크리스트: [`FRONTEND_NO_API_EXECUTION_CHECKLIST.md`](./FRONTEND_NO_API_EXECUTION_CHECKLIST.md). 단계 보고와 판정: `.omp-role/reports/frontend-no-api-t01-shell.md` … `frontend-no-api-t07-final.md`. 실행 명령은 `npm test`(71 files / 531 passed), `npm run typecheck`, `npm run lint`, `npm run build`, `git diff --check`, `npm run test:e2e`(71 passed, chromium/webkit/firefox/pwa-chromium, API egress 0). 남은 외부 게이트(실서버 API·Push·실기기 PWA·SMS/인증·AT 실기기)는 이 실행의 FE 완료 판정과 분리되어 외부 레지스터로 열려 있다.
+
 ## 기준 저장소
 
 - 디자인 원본: [stacking-money-forever/bungae-design](https://github.com/stacking-money-forever/bungae-design)

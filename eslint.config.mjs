@@ -7,7 +7,16 @@ const compat = new FlatCompat({
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
-    ignores: [".next/**", "node_modules/**", "next-env.d.ts"],
+    ignores: [
+      ".next/**",
+      "node_modules/**",
+      "next-env.d.ts",
+      "test-results/**",
+      "playwright-report/**",
+      // Playwright fixtures reuse the name `use` (fixture injection), which
+      // the Next React-hooks rule would misread as a React Hook call.
+      "e2e/**",
+    ],
   },
 ];
 

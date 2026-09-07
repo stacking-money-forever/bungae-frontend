@@ -8,6 +8,7 @@ import { BottomNavigation, type BottomNavigationTab } from "@/components/bottom-
 const tabPaths: Record<string, BottomNavigationTab> = {
   "/": "explore",
   "/filters": "explore",
+  "/locations": "explore",
   "/my-meetups": "my-meetups",
   "/notifications": "notifications",
 };
@@ -18,7 +19,7 @@ export function PersistentBottomNavigation() {
   const pathname = usePathname();
   const reduceMotion = useReducedMotion();
   const activeTab = pathname ? tabPaths[pathname] : undefined;
-  const isFilterSheetRoute = pathname === "/filters";
+  const isFilterSheetRoute = pathname === "/filters" || pathname === "/locations";
 
   return (
     <AnimatePresence initial={false}>

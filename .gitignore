@@ -33,3 +33,8 @@ pnpm-debug.log*
 
 # GJC runtime files
 .gjc/
+
+# E2E / Playwright artifacts (T06a)
+test-results/
+playwright-report/
+blob-report/

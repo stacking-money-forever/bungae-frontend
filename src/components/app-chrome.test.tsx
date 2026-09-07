@@ -34,5 +34,8 @@ describe("shared app chrome", () => {
     expect(stickyHeaderRule).not.toContain("border-bottom");
     expect(stickyHeaderRule).not.toContain("box-shadow");
     expect(css).toMatch(/\.bottom-action-bar \{[\s\S]*box-shadow/);
+    expect(css).toMatch(/\.create-fab \{[\s\S]*bottom: calc\(76px/);
+    expect(css).toMatch(/\.meetup-feed \{[\s\S]*76px \+ 48px/);
+    expect(css).toMatch(/\.route-gesture-surface--foreground \{[\s\S]*width: min\(100%, var\(--screen-product-width\)\)/);
   });
 });

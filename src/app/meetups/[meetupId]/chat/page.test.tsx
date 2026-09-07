@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("next/navigation", () => ({ useParams: () => ({ meetupId: "demo" }) }));
+
 import MeetupChatPage from "./page";
 
 describe("MeetupChatPage", () => {
@@ -107,25 +109,11 @@ describe("MeetupChatPage", () => {
     });
   });
 
-  it("keeps message submission disabled until the draft has content", () => {
+  it("blocks unauthenticated input and submission", () => {
     render(<MeetupChatPage />);
 
-    const input = screen.getByRole("textbox", { name: "메시지 입력" });
-    const sendButton = screen.getByRole("button", { name: "메시지 보내기" });
-
-    expect(sendButton).toBeDisabled();
-    fireEvent.change(input, { target: { value: "   " } });
-    expect(sendButton).toBeDisabled();
-
-    fireEvent.change(input, { target: { value: "안녕하세요!" } });
-    expect(sendButton).toBeEnabled();
-    fireEvent.click(sendButton);
-
-    expect(screen.getByText("안녕하세요!")).toBeInTheDocument();
-    expect(screen.getByText("안녕하세요!")).toHaveClass("chat-content-reveal");
-    expect(screen.getByText("넵, 6시 50분쯤 도착할게요!")).not.toHaveClass(
-      "chat-content-reveal",
-    );
-    expect(sendButton).toBeDisabled();
+    expect(screen.getByText("로그인한 뒤 그룹 채팅을 확인해 주세요.")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "메시지 입력" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "메시지 보내기" })).toBeDisabled();
   });
 });

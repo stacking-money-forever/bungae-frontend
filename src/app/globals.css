@@ -86,16 +86,26 @@ a {
   overflow-x: clip;
 }
 
-.route-transition {
+.route-gesture-surface {
   grid-area: 1 / 1;
+  min-width: 0;
+  min-height: 100svh;
+}
+
+.route-gesture-surface--foreground {
+  position: relative;
+  z-index: 2;
+  width: min(100%, var(--screen-product-width));
+  margin: 0 auto;
+  background: var(--bg-layer-default);
+}
+
+.route-transition {
   min-height: 100svh;
   min-width: 0;
 }
 
 .route-gesture-surface {
-  grid-area: 1 / 1;
-  min-width: 0;
-  min-height: 100svh;
   touch-action: pan-y;
 }
 
@@ -311,7 +321,7 @@ label:has(input:not(:disabled)):active {
 
 .meetup-feed {
   padding-bottom: calc(
-    104px + var(--action-primary-height) + var(--dimension-x4) + env(safe-area-inset-bottom)
+    76px + 48px + var(--dimension-x4) + env(safe-area-inset-bottom)
   );
 }
 
@@ -427,17 +437,17 @@ label:has(input:not(:disabled)):active {
     var(--dimension-x4),
     calc((100vw - var(--screen-product-width)) / 2 + var(--dimension-x4))
   );
-  bottom: calc(104px + env(safe-area-inset-bottom));
+  bottom: calc(76px + env(safe-area-inset-bottom));
   z-index: 11;
   display: inline-flex;
-  min-height: var(--action-primary-height);
+  min-height: 48px;
   align-items: center;
   gap: var(--dimension-x2);
-  padding: 0 var(--dimension-x5);
+  padding: 0 var(--dimension-x4);
   border-radius: 999px;
   background: var(--brand-accent);
   color: var(--fg-on-brand);
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   line-height: 24px;
   white-space: nowrap;

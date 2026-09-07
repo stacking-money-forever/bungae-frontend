@@ -5,7 +5,38 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { ComponentPropsWithoutRef, ReactElement, ReactNode } from "react";
 
 const standardEase = [0.2, 0.8, 0.2, 1] as const;
+const sheetEase = [0.22, 1, 0.36, 1] as const;
 type DialogContentEventHandler = ComponentPropsWithoutRef<typeof Dialog.Content>["onOpenAutoFocus"];
+
+export function getDialogMotionStates(
+  placement: "center" | "bottom",
+  reduceMotion: boolean | null,
+) {
+  if (reduceMotion) {
+    return {
+      initial: false as const,
+      animate: { opacity: 1, y: 0, scale: 1 },
+      exit: { opacity: 1, y: 0, scale: 1 },
+      transition: { duration: 0 },
+    };
+  }
+
+  if (placement === "bottom") {
+    return {
+      initial: { opacity: 1, y: "100%", scale: 1 },
+      animate: { opacity: 1, y: 0, scale: 1 },
+      exit: { opacity: 1, y: "100%", scale: 1 },
+      transition: { type: "tween" as const, duration: 0.28, ease: sheetEase },
+    };
+  }
+
+  return {
+    initial: { opacity: 0, y: 8, scale: 0.98 },
+    animate: { opacity: 1, y: 0, scale: 1 },
+    exit: { opacity: 0, y: 6, scale: 0.98 },
+    transition: { duration: 0.18, ease: standardEase },
+  };
+}
 
 export interface AnimatedDialogProps {
   open: boolean;
@@ -31,6 +62,7 @@ export function AnimatedDialog({
   onCloseAutoFocus,
 }: AnimatedDialogProps) {
   const reduceMotion = useReducedMotion();
+  const motionStates = getDialogMotionStates(placement, reduceMotion);
   const contentPosition =
     placement === "center"
       ? "fixed inset-5 m-auto h-fit max-h-[calc(100svh-40px)]"
@@ -63,10 +95,11 @@ export function AnimatedDialog({
             >
               <motion.section
                 className={`${contentPosition} ${contentShape} z-50 overflow-y-auto bg-[var(--bg-layer-floating)] outline-none ${className ?? ""}`}
-                initial={reduceMotion ? false : { opacity: 0, y: placement === "bottom" ? 24 : 8, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={reduceMotion ? { opacity: 1 } : { opacity: 0, y: placement === "bottom" ? 16 : 6, scale: 0.98 }}
-                transition={reduceMotion ? { duration: 0 } : { duration: 0.18, ease: standardEase }}
+                aria-modal="true"
+                initial={motionStates.initial}
+                animate={motionStates.animate}
+                exit={motionStates.exit}
+                transition={motionStates.transition}
               >
                 {placement === "bottom" ? (
                   <span

@@ -25,15 +25,16 @@ describe("FiltersPage", () => {
   });
 
   it("restores the active filters when the sheet is reopened from a query", () => {
-    window.history.replaceState({}, "", "/filters?activity=%EC%82%B0%EC%B1%85&available=1");
+    window.history.replaceState({}, "", "/filters?location=%EB%A7%88%ED%8F%AC%EA%B5%AC+%ED%95%A9%EC%A0%95%EB%8F%99&activity=%EC%82%B0%EC%B1%85&available=1");
     render(<FiltersPage />);
 
+    expect(screen.getByTestId("filter-home-surface")).toHaveTextContent("마포구 합정동");
     expect(screen.getByRole("combobox", { name: "활동 필터" })).toHaveValue("산책");
     expect(screen.getByRole("switch", { name: "참여 가능한 모임만 보기" })).toHaveAttribute(
       "aria-checked",
       "true",
     );
-    expect(screen.getByRole("button", { name: "결과 3개 보기" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "필터 적용" })).toBeInTheDocument();
   });
 
   it("falls back to visible defaults for invalid shared query values", () => {
@@ -46,8 +47,7 @@ describe("FiltersPage", () => {
       "aria-checked",
       "false",
     );
-    expect(screen.getByRole("button", { name: "결과 6개 보기" })).toBeInTheDocument();
-    expect(screen.getByTestId("filter-home-surface").querySelectorAll(".meetup-list-row")).toHaveLength(6);
+    expect(screen.getByRole("button", { name: "필터 적용" })).toBeInTheDocument();
   });
 
   it("keeps the background inert and updates the availability switch", () => {
@@ -56,27 +56,29 @@ describe("FiltersPage", () => {
     const background = screen.getByTestId("filter-home-surface");
     expect(background).toHaveAttribute("aria-hidden", "true");
     expect(background).toHaveAttribute("inert");
-    expect(screen.getByRole("heading", { name: "오늘 저녁", hidden: true })).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "동네 변경, 현재 마포구 망원동", hidden: true }),
+    ).toBeInTheDocument();
 
     const availabilitySwitch = screen.getByRole("switch", {
       name: "참여 가능한 모임만 보기",
     });
     expect(availabilitySwitch).toHaveAttribute("aria-checked", "false");
-    expect(screen.getByRole("button", { name: "결과 6개 보기" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "필터 적용" })).toBeInTheDocument();
     fireEvent.click(availabilitySwitch);
 
     expect(availabilitySwitch).toHaveAttribute("aria-checked", "true");
-    expect(screen.getByRole("button", { name: "결과 5개 보기" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "필터 적용" })).toBeInTheDocument();
   });
 
-  it("starts on the sheet heading and traps focus within the filter dialog", async () => {
+  it("starts on the first interactive filter and traps focus within the dialog", async () => {
     render(<FiltersPage />);
 
     const dialog = screen.getByRole("dialog", { name: "필터" });
     const resetButton = screen.getByRole("button", { name: "초기화" });
-    const applyButton = screen.getByRole("button", { name: "결과 6개 보기" });
+    const applyButton = screen.getByRole("button", { name: "필터 적용" });
 
-    await waitFor(() => expect(screen.getByRole("heading", { name: "필터" })).toHaveFocus());
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "활동 필터" })).toHaveFocus());
     applyButton.focus();
     fireEvent.keyDown(applyButton, { key: "Tab" });
     expect(resetButton).toHaveFocus();
@@ -86,7 +88,7 @@ describe("FiltersPage", () => {
   it("navigates home only after the sheet exit completes on apply", async () => {
     render(<FiltersPage />);
 
-    fireEvent.click(screen.getByRole("button", { name: "결과 6개 보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "필터 적용" }));
 
     expect(setNavigationIntent).not.toHaveBeenCalled();
     expect(routerPush).not.toHaveBeenCalled();
@@ -98,28 +100,49 @@ describe("FiltersPage", () => {
     });
   });
 
-  it("keeps the visible home fixtures and result count in sync", async () => {
+  it("does not show a fabricated result count while the draft changes", () => {
+    render(<FiltersPage />);
+
+    expect(screen.queryByRole("button", { name: /결과 \d+개 보기/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/모임 \d+개/)).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox", { name: "활동 필터" }), {
+      target: { value: "산책" },
+    });
+    expect(screen.getByRole("button", { name: "필터 적용" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /결과 \d+개 보기/ })).not.toBeInTheDocument();
+  });
+
+  it("serializes the selected draft into the home query on apply", async () => {
     render(<FiltersPage />);
 
     fireEvent.change(screen.getByRole("combobox", { name: "활동 필터" }), {
       target: { value: "산책" },
     });
-
-    expect(screen.getByRole("button", { name: "결과 3개 보기" })).toBeInTheDocument();
-    expect(
-      screen.getByTestId("filter-home-surface").querySelectorAll(".meetup-list-row"),
-    ).toHaveLength(3);
-
-    fireEvent.click(screen.getByRole("button", { name: "결과 3개 보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "필터 적용" }));
     await waitFor(() => {
       expect(setNavigationIntent).toHaveBeenCalledWith("sheet", "/?activity=%EC%82%B0%EC%B1%85");
       expect(routerPush).toHaveBeenCalledWith("/?activity=%EC%82%B0%EC%B1%85");
     });
   });
 
+  it("restores a refreshed query without treating the draft as an apply", async () => {
+    const view = render(<FiltersPage />);
+
+    window.history.replaceState({}, "", "/filters?activity=%EC%82%B0%EC%B1%85");
+    view.rerender(<FiltersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("combobox", { name: "활동 필터" })).toHaveValue("산책");
+      expect(screen.getByRole("button", { name: "필터 적용" })).toBeInTheDocument();
+    });
+  });
+
   it("uses the same sheet exit path when Escape closes the sheet", async () => {
     render(<FiltersPage />);
 
+    fireEvent.change(screen.getByRole("combobox", { name: "활동 필터" }), {
+      target: { value: "산책" },
+    });
     fireEvent.keyDown(screen.getByRole("dialog", { name: "필터" }), { key: "Escape" });
 
     await waitFor(() => {
@@ -131,10 +154,11 @@ describe("FiltersPage", () => {
   it("dismisses from the backdrop through the dialog primitive", async () => {
     render(<FiltersPage />);
 
-    const backdrop = screen.getByTestId("filter-backdrop");
+    const backdrop = document.querySelector('[data-state="open"].fixed.inset-0');
+    expect(backdrop).toBeInTheDocument();
     await new Promise((resolve) => setTimeout(resolve, 0));
-    fireEvent.pointerDown(backdrop);
-    fireEvent.click(backdrop);
+    fireEvent.pointerDown(backdrop as HTMLElement);
+    fireEvent.click(backdrop as HTMLElement);
 
     await waitFor(() => {
       expect(setNavigationIntent).toHaveBeenCalledWith("sheet", "/");
