@@ -1,11 +1,7 @@
 "use client";
 
-import {
-  Info,
-  LockKeyhole,
-} from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { Info, LockKeyhole } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   AnimatedDialog,
@@ -13,172 +9,245 @@ import {
   AnimatedDialogDescription,
   AnimatedDialogTitle,
 } from "@/components/animated-dialog";
+import { OfflineNotice } from "@/components/offline-notice";
 import { ScreenShell } from "@/components/screen-shell";
 import { TopNavigation } from "@/components/top-navigation";
+import { ApiProblemError } from "@/lib/api/client";
+import type { Block, BlockPage } from "@/lib/api/types";
+import { useOptionalAuthSession } from "@/lib/auth/auth-session-provider";
+import { SessionExpiredError } from "@/lib/auth/session-store";
+import { useOnlineStatus } from "@/lib/ui/online";
 
-type BlockedPerson = {
-  id: string;
-  initials: string;
-  name: string;
-  details: string;
+type BlockListState = {
+  subject: string | null;
+  status: "idle" | "loading" | "ready" | "error";
+  items: Block[];
+  nextCursor?: string;
+  error: string | null;
+  loadingMore: boolean;
 };
 
-const initialBlockedPeople: BlockedPerson[] = [
-  { id: "jimin", initials: "지", name: "지민", details: "30대 · 산책" },
-  { id: "seoyeon", initials: "서", name: "서연", details: "20대 · 카페 대화" },
-];
+type PendingUnblock = {
+  subject: string | null;
+  block: Block | null;
+  error: string | null;
+};
+
+type FocusIntent = "count" | "trigger" | null;
+
+function problemMessage(error: unknown, fallback: string) {
+  return error instanceof ApiProblemError ? error.problem?.detail ?? fallback : fallback;
+}
+
+function createdAt(createdAt: string) {
+  const date = new Date(createdAt);
+  return Number.isNaN(date.getTime())
+    ? createdAt
+    : date.toLocaleString("ko-KR", { dateStyle: "medium", timeStyle: "short" });
+}
+
+const emptyListState: BlockListState = {
+  subject: null,
+  status: "idle",
+  items: [],
+  error: null,
+  loadingMore: false,
+};
 
 export default function BlocksPage() {
-  const [blockedPeople, setBlockedPeople] = useState(initialBlockedPeople);
-  const [pendingUnblock, setPendingUnblock] = useState<BlockedPerson | null>(null);
-  const [statusMessage, setStatusMessage] = useState("");
-  const actionRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const countTitleRef = useRef<HTMLHeadingElement>(null);
-  const shouldRestoreFocus = useRef(false);
-  const focusTargetId = useRef<string | null>(null);
-  const pendingUnblockCommitId = useRef<string | null>(null);
-  const reduceMotion = useReducedMotion();
+  const auth = useOptionalAuthSession();
+  const subject = auth?.snapshot.status === "authenticated" ? auth.snapshot.user.id : null;
+  const sessionEpoch = auth?.sessionEpoch ?? 0;
+  // Session-scoped key: same subject re-login is a fresh session.
+  const sessionKey = subject ? `${sessionEpoch}:${subject}` : null;
+  const sessionKeyRef = useRef(sessionKey);
+  const online = useOnlineStatus();
+  const requestRef = useRef(0);
+  const deleteRequestRef = useRef<string | null>(null);
+  const unblockTriggerRef = useRef<HTMLButtonElement>(null);
+  const countHeadingRef = useRef<HTMLHeadingElement>(null);
+  const [state, setState] = useState<BlockListState>(emptyListState);
+  const [pending, setPending] = useState<PendingUnblock>({ subject: null, block: null, error: null });
+  const [focusIntent, setFocusIntent] = useState<FocusIntent>(null);
 
-  const confirmUnblock = () => {
-    if (!pendingUnblock) return;
-    const pendingIndex = blockedPeople.findIndex(({ id }) => id === pendingUnblock.id);
-    shouldRestoreFocus.current = true;
-    focusTargetId.current = blockedPeople[pendingIndex + 1]?.id ?? null;
-    pendingUnblockCommitId.current = pendingUnblock.id;
-    setPendingUnblock(null);
-  };
+  sessionKeyRef.current = sessionKey;
+  const current = state.subject === sessionKey ? state : { ...emptyListState, subject: sessionKey };
+  const currentPending = pending.subject === sessionKey ? pending : { subject: sessionKey, block: null, error: null };
+  const deleting = deleteRequestRef.current !== null;
 
-  const commitUnblockAfterExit = (person: BlockedPerson) => {
-    if (pendingUnblockCommitId.current !== person.id) {
+  const load = useCallback(async (cursor?: string, append = false) => {
+    if (!auth || !sessionKey) return;
+
+    const request = ++requestRef.current;
+    setState((old) => ({
+      subject: sessionKey,
+      status: append ? "ready" : "loading",
+      items: append && old.subject === sessionKey ? old.items : [],
+      nextCursor: append && old.subject === sessionKey ? old.nextCursor : undefined,
+      error: null,
+      loadingMore: append,
+    }));
+
+    try {
+      const page: BlockPage = await auth.listBlocks({ cursor, limit: 20 });
+      if (request !== requestRef.current || sessionKeyRef.current !== sessionKey) return;
+
+      setState((old) => ({
+        subject: sessionKey,
+        status: "ready",
+        items: append && old.subject === sessionKey
+          ? [...old.items, ...page.items.filter((item) => !old.items.some(({ blockedUserId }) => blockedUserId === item.blockedUserId))]
+          : page.items,
+        nextCursor: page.nextCursor,
+        error: null,
+        loadingMore: false,
+      }));
+    } catch (error) {
+      if (request !== requestRef.current || sessionKeyRef.current !== sessionKey || error instanceof SessionExpiredError) return;
+
+      setState((old) => ({
+        subject: sessionKey,
+        status: append ? "ready" : "error",
+        items: append && old.subject === sessionKey ? old.items : [],
+        nextCursor: append && old.subject === sessionKey ? old.nextCursor : undefined,
+        error: problemMessage(error, "차단 목록을 불러오지 못했어요."),
+        loadingMore: false,
+      }));
+    }
+  }, [auth, sessionKey]);
+
+  useEffect(() => {
+    requestRef.current += 1;
+    deleteRequestRef.current = null;
+    setFocusIntent(null);
+
+    if (!sessionKey) {
+      setState(emptyListState);
+      setPending({ subject: null, block: null, error: null });
       return;
     }
 
-    pendingUnblockCommitId.current = null;
-    setStatusMessage(`${person.name}님 차단을 해제했어요.`);
-    setBlockedPeople((current) => current.filter(({ id }) => id !== person.id));
-  };
+    setPending({ subject: sessionKey, block: null, error: null });
+    void load();
+    return () => {
+      requestRef.current += 1;
+    };
+  }, [load, sessionKey]);
 
-  useEffect(() => {
-    if (!shouldRestoreFocus.current) return;
-    shouldRestoreFocus.current = false;
-    const nextAction = focusTargetId.current ? actionRefs.current[focusTargetId.current] : null;
-    (nextAction ?? countTitleRef.current)?.focus();
-  }, [blockedPeople]);
+  async function unblock() {
+    const block = currentPending.block;
+    if (!auth || !sessionKey || !block || deleteRequestRef.current) return;
+    if (!online) {
+      setPending({ subject: sessionKey, block, error: "인터넷 연결이 끊겨 차단을 해제할 수 없어요. 연결을 확인한 뒤 다시 시도해 주세요." });
+      return;
+    }
+
+    const request = `${sessionKey}:${block.blockedUserId}:${crypto.randomUUID()}`;
+    deleteRequestRef.current = request;
+    setPending({ subject: sessionKey, block, error: null });
+
+    try {
+      await auth.deleteBlock(block.blockedUserId);
+      if (deleteRequestRef.current !== request || sessionKeyRef.current !== sessionKey) return;
+
+      setState((old) => old.subject !== sessionKey
+        ? old
+        : { ...old, items: old.items.filter(({ blockedUserId }) => blockedUserId !== block.blockedUserId) });
+      setPending({ subject: sessionKey, block: null, error: null });
+      setFocusIntent("count");
+    } catch (error) {
+      if (deleteRequestRef.current !== request || sessionKeyRef.current !== sessionKey || error instanceof SessionExpiredError) return;
+      setPending({ subject: sessionKey, block, error: problemMessage(error, "차단을 해제하지 못했어요.") });
+    } finally {
+      if (deleteRequestRef.current === request) deleteRequestRef.current = null;
+    }
+  }
+
+  function handleDialogExit() {
+    if (focusIntent === "trigger") unblockTriggerRef.current?.focus();
+    if (focusIntent === "count") countHeadingRef.current?.focus();
+    if (focusIntent) setFocusIntent(null);
+  }
 
   return (
     <ScreenShell className="px-5 pb-8">
-      <TopNavigation
-        href="/profile"
-        title={<span className="font-display text-[16px] font-normal leading-6">차단 목록</span>}
-        trailing={
-          <span className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-[var(--fg-muted)]" aria-label="나만 볼 수 있는 목록">
-            <LockKeyhole size={24} strokeWidth={1.8} aria-hidden="true" />
-          </span>
-        }
-        className="-mx-5 px-4"
-      />
+      <TopNavigation href="/profile" title="차단 관리" />
+      <main>
+        <section className="mt-6">
+          <div className="flex items-start gap-3 bg-[var(--bg-neutral-weak)] px-4 py-3">
+            <Info size={22} aria-hidden="true" />
+            <p className="m-0">차단한 계정은 이름과 프로필을 제공하지 않는 서버 계약으로 관리돼요.</p>
+          </div>
 
-      <section className="pt-4" aria-labelledby="blocks-intro-title">
-        <h1 id="blocks-intro-title" className="m-0 text-[14px] font-bold leading-[22px] text-[var(--fg-neutral)]">차단한 사람은 서로의 모임과 프로필에 보이지 않아요.</h1>
-        <p className="m-0 mt-1 text-[14px] leading-[22px] text-[var(--fg-muted)]">차단 목록은 나만 볼 수 있어요.</p>
-      </section>
+          <OfflineNotice />
+          {sessionKey === null ? <p role="alert">로그인한 뒤 차단 목록을 확인해 주세요.</p> : null}
+          {current.status === "loading" ? <p role="status">차단 목록을 불러오는 중이에요.</p> : null}
+          {current.status === "error" ? (
+            <div role="alert">
+              <p>{current.error}</p>
+              <button onClick={() => void load()} type="button">다시 시도</button>
+            </div>
+          ) : null}
+          {current.status === "ready" && current.items.length === 0 ? <p role="status">차단한 사람이 없어요.</p> : null}
 
-      <section className="mt-2" aria-labelledby="blocked-count-title">
-        <h2
-          ref={countTitleRef}
-          id="blocked-count-title"
-          tabIndex={-1}
-          className="m-0 text-[13px] font-normal leading-5 text-[var(--fg-muted)]"
-        >
-          차단한 사람 {blockedPeople.length}명
-        </h2>
-        <ul className={`m-0 list-none p-0 ${blockedPeople.length > 0 ? "mt-2" : ""}`}>
-          <AnimatePresence initial={false} mode="popLayout">
-            {blockedPeople.map((person) => (
-              <motion.li
-                key={person.id}
-                layout
-                initial={false}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -12 }}
-                transition={{ duration: reduceMotion ? 0 : 0.16, ease: "easeOut" }}
-                className="flex min-h-[64px] items-center gap-3 border-b border-[var(--stroke-neutral)] py-2"
-              >
-                <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--bg-layer-floating)] text-[16px] font-bold text-[var(--fg-neutral)]" aria-hidden="true">{person.initials}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[14px] font-bold leading-5 text-[var(--fg-neutral)]">{person.name}</span>
-                  <span className="block text-[11px] font-medium leading-4 text-[var(--fg-muted)]">{person.details}</span>
-                </span>
-                <AnimatedDialog
-                  open={pendingUnblock?.id === person.id}
-                  onOpenChange={(open) => {
-                    if (open) {
-                      setPendingUnblock(person);
-                    } else {
-                      setPendingUnblock((current) => (current?.id === person.id ? null : current));
-                    }
+          <h1 ref={countHeadingRef} tabIndex={-1} className="m-0 mt-4 text-[16px] font-bold leading-6 text-[var(--fg-neutral)] outline-none">차단한 사람 {current.items.length}명</h1>
+          <ul className="m-0 mt-3 grid list-none gap-3 p-0">
+            {current.items.map((block) => (
+              <li key={block.blockedUserId} className="flex items-center gap-2 rounded-2xl border border-[var(--stroke-neutral)] p-3">
+                <LockKeyhole className="shrink-0 text-[var(--fg-muted)]" size={18} aria-hidden="true" />
+                <span className="min-w-0 flex-1 break-all text-[14px] font-semibold text-[var(--fg-neutral)]">{block.blockedUserId}</span>
+                <time dateTime={block.createdAt} className="shrink-0 text-[12px] leading-4 text-[var(--fg-muted)]">{createdAt(block.createdAt)}</time>
+                <button
+                  type="button"
+                  disabled={!online}
+                  onClick={(event) => {
+                    unblockTriggerRef.current = event.currentTarget;
+                    setPending({ subject: sessionKey, block, error: null });
                   }}
-                  onExitComplete={() => {
-                    if (pendingUnblockCommitId.current === person.id) {
-                      commitUnblockAfterExit(person);
-                    } else {
-                      actionRefs.current[person.id]?.focus();
-                    }
-                  }}
-                  onCloseAutoFocus={(event) => event.preventDefault()}
-                  trigger={
-                    <button
-                      type="button"
-                      ref={(element) => {
-                        actionRefs.current[person.id] = element;
-                      }}
-                      className="inline-flex min-h-[44px] shrink-0 items-center px-2 text-[14px] font-bold text-[var(--fg-neutral)] focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
-                      aria-label={`${person.name}님 차단 해제`}
-                    >
-                      차단 해제
-                    </button>
-                  }
-                  className="max-w-[390px]"
+                  className="shrink-0 rounded-[8px] border border-[var(--stroke-neutral)] px-3 py-2 text-[13px] font-bold text-[var(--fg-neutral)] disabled:opacity-60"
                 >
-                  <AnimatedDialogTitle className="m-0 text-[16px] font-bold leading-6 text-[var(--fg-neutral)]">
-                    차단을 해제할까요?
-                  </AnimatedDialogTitle>
-                  <AnimatedDialogDescription className="m-0 mt-2 text-[14px] leading-[22px] text-[var(--fg-muted)]">
-                    {person.name}님이 이후 모임과 프로필에 다시 보이고, 서로 만날 수 있어요.
-                  </AnimatedDialogDescription>
-                  <div className="mt-4 flex gap-2">
-                    <AnimatedDialogClose asChild>
-                      <button
-                        type="button"
-                        className="min-h-[52px] flex-1 border border-[var(--stroke-neutral)] px-3 text-[15px] font-bold text-[var(--fg-neutral)] focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
-                      >
-                        취소
-                      </button>
-                    </AnimatedDialogClose>
-                    <button
-                      type="button"
-                      className="min-h-[52px] flex-1 bg-[var(--fg-neutral)] px-3 text-[15px] font-bold text-[var(--bg-layer-floating)] focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
-                      onClick={confirmUnblock}
-                    >
-                      차단 해제
-                    </button>
-                  </div>
-                </AnimatedDialog>
-              </motion.li>
+                  차단 해제
+                </button>
+              </li>
             ))}
-          </AnimatePresence>
-        </ul>
-        {blockedPeople.length === 0 ? (
-          <p className="m-0 mt-4 border-b border-[var(--stroke-neutral)] pb-4 text-[14px] leading-[22px] text-[var(--fg-muted)]" role="status">차단한 사람이 없어요.</p>
-        ) : null}
-      </section>
+          </ul>
 
-      <p className="m-0 mt-4 flex items-start gap-3 text-[14px] leading-6 text-[var(--fg-muted)]">
-        <Info className="mt-0.5 shrink-0" size={22} strokeWidth={1.8} aria-hidden="true" />
-        <span>차단을 해제하면 이후 모임에서 다시 만날 수 있어요.</span>
-      </p>
-      <p className="sr-only" aria-live="polite">{statusMessage}</p>
+          {current.nextCursor ? (
+            <button type="button" disabled={current.loadingMore} onClick={() => void load(current.nextCursor, true)}>
+              {current.loadingMore ? "더 불러오는 중…" : "더 보기"}
+            </button>
+          ) : null}
+          {current.status === "ready" && current.error ? (
+            <div role="alert">
+              <p>{current.error}</p>
+              <button type="button" onClick={() => void load(current.nextCursor, true)}>다시 시도</button>
+            </div>
+          ) : null}
+        </section>
+      </main>
 
+      <AnimatedDialog
+        open={currentPending.block !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleteRequestRef.current) {
+            setPending({ subject: sessionKey, block: null, error: null });
+            setFocusIntent("trigger");
+          }
+        }}
+        onExitComplete={handleDialogExit}
+      >
+        <AnimatedDialogTitle>차단을 해제할까요?</AnimatedDialogTitle>
+        <AnimatedDialogDescription>서버가 차단 해제를 완료할 때까지 목록은 유지돼요.</AnimatedDialogDescription>
+        {currentPending.error ? <p role="alert">{currentPending.error}</p> : null}
+        <div className="flex gap-2">
+          <button type="button" disabled={deleting || !online} onClick={() => void unblock()}>
+            {deleting ? "차단 해제 중…" : "차단 해제"}
+          </button>
+          <AnimatedDialogClose asChild>
+            <button type="button" disabled={deleting || !online}>취소</button>
+          </AnimatedDialogClose>
+        </div>
+      </AnimatedDialog>
     </ScreenShell>
   );
 }

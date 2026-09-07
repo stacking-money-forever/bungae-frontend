@@ -45,6 +45,13 @@ describe("PersistentBottomNavigation", () => {
     expect(screen.queryByRole("navigation", { name: "주요 메뉴" })).not.toBeInTheDocument();
   });
 
+  it("removes the tab bar from the authentication route", () => {
+    usePathname.mockReturnValue("/auth");
+    render(<PersistentBottomNavigation />);
+
+    expect(screen.queryByRole("navigation", { name: "주요 메뉴" })).not.toBeInTheDocument();
+  });
+
   it("rerenders the same mounted tab bar across filter and root routes", async () => {
     const { rerender } = render(<PersistentBottomNavigation />);
 

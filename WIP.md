@@ -2,70 +2,29 @@
 
 ## 현재 상태
 
-기준 커밋: `ef30359 feat: implement bungae frontend screens`
+참가자용 모바일 프론트엔드 22개 라우트와 주요 로컬 상태 흐름이 구현되어 있다. 홈은 공개 장소·활동 사진을 사용하는 2열 그리드이며, 필터는 같은 fixture에서 결과 수와 실제 카드를 계산한다.
 
-모션 구조 교체와 다이얼로그·로컬 상태 전환 작업은 구현 및 검증을 마쳤고, 현재 워킹 트리에 커밋되지 않은 상태로 남아 있다.
+공통 앱 셸은 고정 헤더, 하단 내비게이션·하단 액션 elevation, 탭 좌우 드래그, 상세 화면 오른쪽 스와이프 뒤로가기를 제공한다. 생성 화면은 시간 휠·공개 장소 선택·24시간/시간 순서/인원 검증을 제공하고, 상세 화면은 실제 신고·차단 로컬 상태 흐름을 제공한다.
 
-완료된 구현:
+백엔드 API는 연결하지 않았다. [API_CONTRACT.md](docs/API_CONTRACT.md)는 구현 화면과 명세를 연결한 제안 계약이며, 서버에 엔드포인트가 존재한다는 의미가 아니다.
 
-- 목적지 화면 하나만 렌더링하는 incoming-only 라우트 전환
-- `push` / `pop` / `tab` / `sheet` / `replace` 전환 intent
-- history entry index 기반 browser back=`pop`, forward=`push` 판별
-- pathname+search route identity와 query/hash history 정책
-- 확정된 Next navigation에서만 intent를 기록하는 `NavigationLink`
-- 경량 navigation intent store 분리
-- 루트 화면 밖의 persistent bottom navigation과 Motion active mark
-- `/filters`에서도 마운트를 유지하되 modal 배경으로 비활성화되는 하단 탭바
-- Radix 기반 filter sheet 및 공통 `AnimatedDialog`
-- filter/dialog focus trap, initial focus, Escape/backdrop dismiss, exit 후 focus 복원
-- filter switch thumb와 list/result layout motion
-- destructive confirm의 dialog exit 후 상태 변경·navigation
-- Reduced Motion의 route/sheet/dialog/layout/CSS/press transition 비활성화
-- 프로필·연결·차단·미달 결정·연결 성립 화면의 dialog/layout motion
-- URL query를 첫 client render부터 반영하고 cold HTML에는 중립 fallback을 사용하는 query 화면
-- 미달 인원 쿼리 부재 시 `2명 → 0명`으로 바뀌던 버그 수정
+## 검증 기준선
 
-## 검증 결과
-
-- `npm test -- --reporter=dot`: 15 files, 60 tests 통과
+- `npm test -- --reporter=dot`: 23 files, 92 tests 통과
 - `npm run typecheck`: 통과
-- `npm run lint`: 통과
+- `npm run lint`: 경고 없이 통과
 - `npm run build`: 통과
-- `git diff --check`: 통과
-- production build 홈 First Load JS 관측값: 107 kB
-- Reduced Motion 통합 테스트에서는 preference 활성화를 알리는 Motion 개발용 warning 1건이 출력됨
+- 생성 정적 HTML Anti-slop: 9 files, severity 0
+- 22/22 라우트: 390px 제품 셸, 실제 가로 스크롤 0, 콘솔·page error 0
+- 핵심 화면 4개: Playwright 390×844 캡처 및 육안 검사 완료
 
-390×844 Chromium QA:
+세부 증거는 [artifacts/qa/QA_TRANSCRIPT.md](artifacts/qa/QA_TRANSCRIPT.md)에 있다.
 
-- route surface, bottom navigation, active mark가 각각 1개로 유지됨
-- tab=`tab`, filter=`sheet`, visual back link=`pop`
-- 괄호 안 숫자를 history entry index로 두고 `root(0) → detail(1) → 화면의 뒤로가기 링크로 root(2) → browser back detail(1/pop) → forward root(2/push)` 확인
-- push 화면의 하단 탭바 exit와 fixed CTA viewport 하단 고정 확인
-- filter에서 하단 탭바 DOM은 유지되지만 `aria-hidden` + `inert`로 비활성화됨
-- filter initial focus, focus containment, Escape exit 후 홈 이동 확인
-- dialog Escape dismiss와 destructive confirm exit 후 row/result commit 및 focus 이동 확인
-- 가로 overflow 0, filter sheet 390×594, clipping 문제 없음
-- Reduced Motion에서 route/sheet transform `none`, sheet/press duration `0s`, result/disclosure animation `none`
-- 확인한 화면에서 runtime console error 없음
+## 남은 확인
 
-## 후속 작업
+- 실제 iOS/Android 손가락 입력으로 하단 탭 드래그 임계값·취소·세로 스크롤 충돌 확인
+- 디자인 저장소의 기존 `썸네일 없음` 기준을 승인된 홈 그리드 방향과 동기화
+- API 계약의 미해결 결정 `D-01`~`D-16` 확정 후 백엔드 구현·연동
+- Next가 포함한 PostCSS 취약점 해결을 위한 Next 16 메이저 업그레이드 별도 검토
 
-알려진 요구사항과 위 검증 범위에서 구현 작업은 남아 있지 않다. 현재 변경은 unstaged 상태로 보존한다.
-
-커밋은 사용자가 요청할 때 아래처럼 분리한다.
-
-1. `feat: rebuild app navigation motion`
-   - `motion`, navigation intent/history, persistent bottom navigation, filter sheet, Reduced Motion, 관련 테스트
-2. `feat: animate dialogs and local state changes`
-   - Radix dialog primitive, profile/connections/blocks/quorum/matched layout motion, 관련 테스트
-
-커밋 전:
-
-```bash
-git diff --check
-git status --short
-git diff --stat
-git diff --cached --stat
-```
-
-푸시는 사용자가 별도로 요청할 때만 수행한다.
+커밋과 푸시는 사용자가 명시적으로 요청할 때만 수행한다.

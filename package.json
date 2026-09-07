@@ -8,10 +8,14 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:pwa": "playwright test --project=pwa-chromium",
+    "test:e2e:harness": "playwright test --config=playwright.harness.config.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.23",
+    "firebase": "^12.18.0",
     "lucide-react": "^0.468.0",
     "motion": "^13.1.1",
     "next": "^15.1.6",
@@ -20,6 +24,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.0.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",

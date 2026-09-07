@@ -1,185 +1,216 @@
 "use client";
 
-import {
-  LockKeyhole,
-  ShieldCheck,
-} from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-import {
-  AnimatedDialog,
-  AnimatedDialogClose,
-  AnimatedDialogDescription,
-  AnimatedDialogTitle,
-} from "@/components/animated-dialog";
+import { AnimatedDialog, AnimatedDialogClose, AnimatedDialogDescription, AnimatedDialogTitle } from "@/components/animated-dialog";
 import { ScreenShell } from "@/components/screen-shell";
 import { TopNavigation } from "@/components/top-navigation";
+import { ApiProblemError } from "@/lib/api/client";
+import { useAuthSession } from "@/lib/auth/auth-session-provider";
+import type { ConnectionPage } from "@/lib/api/types";
 
-type Connection = {
-  id: string;
-  initials: string;
-  name: string;
-  meetup: string;
-  when: string;
-};
+type Connection = ConnectionPage["items"][number];
 
-const initialConnections: Connection[] = [
-  { id: "minji", initials: "민", name: "민지", meetup: "합정 보드게임", when: "오늘 19:00" },
-  { id: "doyoon", initials: "도", name: "도윤", meetup: "퇴근 후 한강 산책", when: "어제 18:30" },
-];
+function message(cause: unknown, fallback: string) {
+  return cause instanceof ApiProblemError ? cause.problem?.detail ?? fallback : fallback;
+}
 
 export default function ConnectionsPage() {
-  const [connections, setConnections] = useState(initialConnections);
-  const [pendingEnd, setPendingEnd] = useState<Connection | null>(null);
-  const [statusMessage, setStatusMessage] = useState("");
+  const { snapshot, listConnections, deleteConnection } = useAuthSession();
+  const identity = snapshot.status === "authenticated" ? snapshot.user.id : "anonymous";
+  const requestRef = useRef(0);
+  const identityRef = useRef(identity);
+  const titleRef = useRef<HTMLHeadingElement>(null);
   const actionRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const countTitleRef = useRef<HTMLHeadingElement>(null);
-  const shouldRestoreFocus = useRef(false);
-  const focusTargetId = useRef<string | null>(null);
-  const pendingEndCommitId = useRef<string | null>(null);
-  const reduceMotion = useReducedMotion();
+  const [items, setItems] = useState<Connection[]>([]);
+  const [cursor, setCursor] = useState<string>();
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [appendError, setAppendError] = useState("");
+  const [isAppending, setIsAppending] = useState(false);
+  const [pending, setPending] = useState<Connection | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const [status, setStatus] = useState("");
 
-  const confirmEnd = () => {
-    if (!pendingEnd) return;
-    const pendingIndex = connections.findIndex(({ id }) => id === pendingEnd.id);
-    shouldRestoreFocus.current = true;
-    focusTargetId.current = connections[pendingIndex + 1]?.id ?? null;
-    pendingEndCommitId.current = pendingEnd.id;
-    setPendingEnd(null);
-  };
+  identityRef.current = identity;
 
-  const commitEndAfterExit = (connection: Connection) => {
-    if (pendingEndCommitId.current !== connection.id) {
+  const isCurrent = (request: number, requestIdentity: string) => (
+    request === requestRef.current && requestIdentity === identityRef.current
+  );
+
+  const loadInitial = async (request: number, requestIdentity: string) => {
+    if (snapshot.status !== "authenticated") {
+      if (isCurrent(request, requestIdentity)) {
+        setLoading(false);
+        setLoadError("로그인 후 연결을 확인할 수 있어요.");
+      }
       return;
     }
 
-    pendingEndCommitId.current = null;
-    setStatusMessage(`${connection.name}님과의 연결을 종료했어요.`);
-    setConnections((current) => current.filter(({ id }) => id !== connection.id));
+    try {
+      const page = await listConnections({ limit: 20 });
+      if (!isCurrent(request, requestIdentity)) return;
+      setItems(page.items);
+      setCursor(page.nextCursor);
+      setLoading(false);
+    } catch (cause) {
+      if (!isCurrent(request, requestIdentity)) return;
+      setLoadError(message(cause, "연결을 불러오지 못했어요."));
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    if (!shouldRestoreFocus.current) return;
-    shouldRestoreFocus.current = false;
-    const nextAction = focusTargetId.current ? actionRefs.current[focusTargetId.current] : null;
-    (nextAction ?? countTitleRef.current)?.focus();
-  }, [connections]);
+    const request = ++requestRef.current;
+    const requestIdentity = identity;
+
+    setItems([]);
+    setCursor(undefined);
+    setLoadError("");
+    setAppendError("");
+    setDeleteError("");
+    setIsAppending(false);
+    setDeleting(false);
+    setPending(null);
+    setStatus("");
+    setLoading(true);
+    void loadInitial(request, requestIdentity);
+    // This generation and identity pair owns every async completion for the page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identity, listConnections, snapshot.status]);
+
+  useEffect(() => {
+    if (status) titleRef.current?.focus();
+  }, [status]);
+
+  const retryInitial = () => {
+    const request = ++requestRef.current;
+    const requestIdentity = identity;
+    setLoading(true);
+    setLoadError("");
+    void loadInitial(request, requestIdentity);
+  };
+
+  const loadMore = () => {
+    if (!cursor || isAppending) return;
+
+    const request = requestRef.current;
+    const requestIdentity = identity;
+    const nextCursor = cursor;
+    setIsAppending(true);
+    setAppendError("");
+
+    void listConnections({ cursor: nextCursor, limit: 20 })
+      .then((page) => {
+        if (!isCurrent(request, requestIdentity)) return;
+        setItems((current) => [
+          ...current,
+          ...page.items.filter((item) => !current.some((old) => old.connectionId === item.connectionId)),
+        ]);
+        setCursor(page.nextCursor);
+      })
+      .catch((cause: unknown) => {
+        if (!isCurrent(request, requestIdentity)) return;
+        setAppendError(message(cause, "연결을 더 불러오지 못했어요."));
+      })
+      .finally(() => {
+        if (isCurrent(request, requestIdentity)) setIsAppending(false);
+      });
+  };
+
+  const end = () => {
+    if (!pending || deleting) return;
+
+    const connection = pending;
+    const request = requestRef.current;
+    const requestIdentity = identity;
+    setDeleting(true);
+    setDeleteError("");
+
+    void deleteConnection(connection.connectionId)
+      .then(() => {
+        if (!isCurrent(request, requestIdentity)) return;
+        setItems((current) => {
+          const index = current.findIndex((item) => item.connectionId === connection.connectionId);
+          const nextId = current[index + 1]?.connectionId;
+          queueMicrotask(() => (actionRefs.current[nextId] ?? titleRef.current)?.focus());
+          return current.filter((item) => item.connectionId !== connection.connectionId);
+        });
+        setPending(null);
+        setStatus(`${connection.counterpart.displayName}님과의 연결을 종료했어요.`);
+      })
+      .catch((cause: unknown) => {
+        if (!isCurrent(request, requestIdentity)) return;
+        setDeleteError(message(cause, "연결을 종료하지 못했어요. 다시 시도해 주세요."));
+      })
+      .finally(() => {
+        if (isCurrent(request, requestIdentity)) setDeleting(false);
+      });
+  };
 
   return (
     <ScreenShell className="px-5 pb-8">
-      <TopNavigation
-        href="/profile"
-        title={<span className="font-display text-[16px] font-normal leading-6">연결 목록</span>}
-        trailing={
-          <span className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-[var(--fg-neutral)]" aria-label="상호 선택 연결">
-            <ShieldCheck size={24} strokeWidth={1.8} aria-hidden="true" />
-          </span>
-        }
-        className="-mx-5 px-4"
-      />
-
-      <section className="pt-4" aria-labelledby="connections-intro-title">
-        <h1 id="connections-intro-title" className="m-0 text-[16px] font-bold leading-6 text-[var(--fg-neutral)]">서로 선택한 사람만 연결돼요.</h1>
-        <p className="m-0 mt-1 text-[14px] leading-[22px] text-[var(--fg-muted)]">한쪽의 선택은 상대에게 공개되지 않아요.</p>
-      </section>
-
-      <section className="mt-7" aria-labelledby="connections-count-title">
-        <h2
-          ref={countTitleRef}
-          id="connections-count-title"
-          tabIndex={-1}
-          className="m-0 text-[13px] font-normal leading-5 text-[var(--fg-muted)]"
-        >
-          연결된 사람 {connections.length}명
-        </h2>
-        <ul className={`m-0 list-none p-0 ${connections.length > 0 ? "mt-2" : ""}`}>
-          <AnimatePresence initial={false} mode="popLayout">
-            {connections.map((connection) => (
-              <motion.li
-                key={connection.id}
-                layout
-                initial={false}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -12 }}
-                transition={{ duration: reduceMotion ? 0 : 0.16, ease: "easeOut" }}
-                className="flex min-h-[84px] items-center gap-3 border-b border-[var(--stroke-neutral)] py-3"
-              >
-                <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--brand-accent)] text-[16px] font-bold text-[var(--fg-on-brand)]" aria-hidden="true">{connection.initials}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[14px] font-bold leading-5 text-[var(--fg-neutral)]">{connection.name}</span>
-                  <span className="block truncate text-[11px] font-medium leading-4 text-[var(--fg-muted)]">{connection.meetup} · {connection.when}</span>
-                </span>
-                <AnimatedDialog
-                  open={pendingEnd?.id === connection.id}
-                  onOpenChange={(open) => {
-                    if (open) {
-                      setPendingEnd(connection);
-                    } else {
-                      setPendingEnd((current) => (current?.id === connection.id ? null : current));
-                    }
-                  }}
-                  onExitComplete={() => {
-                    if (pendingEndCommitId.current === connection.id) {
-                      commitEndAfterExit(connection);
-                    } else {
-                      actionRefs.current[connection.id]?.focus();
-                    }
-                  }}
-                  onCloseAutoFocus={(event) => event.preventDefault()}
-                  trigger={
-                    <button
-                      type="button"
-                      ref={(element) => {
-                        actionRefs.current[connection.id] = element;
-                      }}
-                      className="inline-flex min-h-[44px] shrink-0 items-center px-2 text-[14px] font-bold text-[var(--fg-neutral)] focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
-                      aria-label={`${connection.name}님과 연결 종료`}
-                    >
-                      연결 종료
-                    </button>
-                  }
-                  className="max-w-[390px]"
+      <TopNavigation href="/profile" title={<span>연결 목록</span>} />
+      <h1>서로 선택한 사람만 연결돼요.</h1>
+      <p>연결 상세 화면은 아직 제공되지 않아요. 상세 확인을 누르면 안내 화면으로 이동해요.</p>
+      <h2 ref={titleRef} tabIndex={-1}>연결된 사람 {items.length}명</h2>
+      {loading ? <p role="status">연결을 불러오는 중이에요.</p> : null}
+      {loadError ? (
+        <div role="alert">
+          <p>{loadError}</p>
+          <button type="button" onClick={retryInitial}>다시 시도</button>
+        </div>
+      ) : null}
+      {!loading && !loadError && items.length === 0 ? <p role="status">아직 연결된 사람이 없어요.</p> : null}
+      <ul>
+        {items.map((item) => (
+          <li key={item.connectionId}>
+            <Link
+              className="inline-flex min-h-[44px] min-w-0 items-center gap-2 text-[var(--fg-neutral)] focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
+              href={`/connections/${encodeURIComponent(item.connectionId)}`}
+              aria-label={`${item.counterpart.displayName}님 연결 상세`}
+            >
+              <strong className="min-w-0 truncate">{item.counterpart.displayName}</strong>
+              <span className="shrink-0 text-[length:var(--type-meta)] leading-4 text-[var(--fg-muted)]">상세 확인</span>
+            </Link>
+            <time dateTime={item.matchedAt}>{item.matchedAt}</time>
+            <AnimatedDialog
+              open={pending?.connectionId === item.connectionId}
+              onOpenChange={(open) => setPending(open ? item : null)}
+              trigger={(
+                <button
+                  type="button"
+                  ref={(node) => { actionRefs.current[item.connectionId] = node; }}
+                  aria-label={`${item.counterpart.displayName}님과 연결 종료`}
                 >
-                  <AnimatedDialogTitle className="m-0 text-[16px] font-bold leading-6 text-[var(--fg-neutral)]">
-                    연결을 종료할까요?
-                  </AnimatedDialogTitle>
-                  <AnimatedDialogDescription className="m-0 mt-2 text-[14px] leading-[22px] text-[var(--fg-muted)]">
-                    {connection.name}님과의 1:1 대화가 닫혀요. 다시 연결하려면 같은 모임에서 서로 선택해야 해요.
-                  </AnimatedDialogDescription>
-                  <div className="mt-4 flex gap-2">
-                    <AnimatedDialogClose asChild>
-                      <button
-                        type="button"
-                        className="min-h-[52px] flex-1 border border-[var(--stroke-neutral)] px-3 text-[15px] font-bold text-[var(--fg-neutral)] focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
-                      >
-                        취소
-                      </button>
-                    </AnimatedDialogClose>
-                    <button
-                      type="button"
-                      className="min-h-[52px] flex-1 bg-[var(--fg-neutral)] px-3 text-[15px] font-bold text-[var(--bg-layer-floating)] focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
-                      onClick={confirmEnd}
-                    >
-                      연결 종료
-                    </button>
-                  </div>
-                </AnimatedDialog>
-              </motion.li>
-            ))}
-          </AnimatePresence>
-        </ul>
-        {connections.length === 0 ? (
-          <p className="m-0 mt-4 border-b border-[var(--stroke-neutral)] pb-4 text-[14px] leading-[22px] text-[var(--fg-muted)]" role="status">아직 연결된 사람이 없어요.</p>
-        ) : null}
-      </section>
-
-      <p className="m-0 mt-4 flex items-start gap-3 text-[14px] leading-6 text-[var(--fg-muted)]">
-        <LockKeyhole className="mt-0.5 shrink-0" size={22} strokeWidth={1.8} aria-hidden="true" />
-        <span>연결은 같은 모임에서 체크인한 사람끼리만 만들 수 있어요.</span>
-      </p>
-      <p className="sr-only" aria-live="polite">{statusMessage}</p>
-
+                  연결 종료
+                </button>
+              )}
+            >
+              <AnimatedDialogTitle>연결을 종료할까요?</AnimatedDialogTitle>
+              <AnimatedDialogDescription>이 작업은 서버에서 연결을 삭제한 뒤에만 목록에 반영돼요.</AnimatedDialogDescription>
+              <AnimatedDialogClose asChild><button type="button">취소</button></AnimatedDialogClose>
+              <button type="button" disabled={deleting} onClick={end}>{deleting ? "종료 중..." : "연결 종료"}</button>
+            </AnimatedDialog>
+          </li>
+        ))}
+      </ul>
+      {cursor ? <button type="button" disabled={isAppending} onClick={loadMore}>{isAppending ? "더 불러오는 중..." : "더 보기"}</button> : null}
+      {appendError ? (
+        <div role="alert">
+          <p>{appendError}</p>
+          <button type="button" onClick={loadMore}>더 보기 재시도</button>
+        </div>
+      ) : null}
+      {deleteError ? (
+        <div role="alert">
+          <p>{deleteError}</p>
+          <button type="button" disabled={deleting} onClick={end}>다시 시도</button>
+        </div>
+      ) : null}
+      <p className="sr-only" aria-live="polite">{status}</p>
     </ScreenShell>
   );
 }
