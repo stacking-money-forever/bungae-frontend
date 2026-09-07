@@ -13,8 +13,22 @@ import { ApiProblemError } from "@/lib/api/client";
 import { useAuthSession } from "@/lib/auth/auth-session-provider";
 import { useOnlineStatus } from "@/lib/ui/online";
 
-const phoneNumberPattern = /^\+[1-9][0-9]{7,14}$/;
+const koreanMobilePattern = /^010-\d{4}-\d{4}$/;
 const otpPattern = /^[0-9]{6}$/;
+
+function formatKoreanMobile(value: string): string {
+  let digits = value.replace(/\D/g, "");
+  if (digits.startsWith("8210")) digits = `0${digits.slice(2)}`;
+  if (digits.startsWith("10")) digits = `0${digits}`;
+  if (!digits.startsWith("010")) digits = `010${digits}`;
+  digits = digits.slice(0, 11);
+  return `010-${digits.slice(3, 7)}${digits.length > 7 ? `-${digits.slice(7)}` : ""}`;
+}
+
+function toKoreanMobileE164(value: string): string | null {
+  if (!koreanMobilePattern.test(value)) return null;
+  return `+82${value.replace(/\D/g, "").slice(1)}`;
+}
 
 type AuthPhase = "phone" | "otp";
 
@@ -25,7 +39,7 @@ function messageForProblem(error: unknown): string {
 
   switch (error.problem?.code) {
     case "INVALID_PHONE_NUMBER":
-      return "국가 코드를 포함한 올바른 휴대전화 번호를 입력해 주세요.";
+      return "010-으로 시작하는 휴대전화 번호 11자리를 입력해 주세요.";
     case "OTP_RATE_LIMITED":
       return "요청이 많아요. 잠시 후 다시 인증번호를 요청해 주세요.";
     case "OTP_INVALID":
@@ -43,7 +57,7 @@ export default function AuthPage() {
   const { requestOtp, createSession, snapshot } = auth;
   const online = useOnlineStatus();
   const [phase, setPhase] = useState<AuthPhase>("phone");
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("010-");
   const [otp, setOtp] = useState("");
   const [challenge, setChallenge] = useState<{ requestId: string; expiresAt: string } | null>(null);
   const [retryAvailableAt, setRetryAvailableAt] = useState<number | null>(null);
@@ -128,8 +142,9 @@ export default function AuthPage() {
       phoneInputRef.current?.focus();
       return;
     }
-    if (!phoneNumberPattern.test(phoneNumber)) {
-      setRequestError("국가 코드를 포함한 올바른 휴대전화 번호를 입력해 주세요.");
+    const e164PhoneNumber = toKoreanMobileE164(phoneNumber);
+    if (!e164PhoneNumber) {
+      setRequestError("010-으로 시작하는 휴대전화 번호 11자리를 입력해 주세요.");
       phoneInputRef.current?.focus();
       return;
     }
@@ -142,7 +157,7 @@ export default function AuthPage() {
     setStatusMessage("인증번호를 요청하고 있어요.");
     try {
       const nextChallenge = await requestOtp({
-        phoneNumber,
+        phoneNumber: e164PhoneNumber,
         purpose: "SIGN_UP_OR_LOGIN",
       });
       if (requestAttemptRef.current !== attempt) return;
@@ -272,13 +287,13 @@ export default function AuthPage() {
                 type="tel"
                 autoComplete="tel"
                 inputMode="tel"
-                placeholder="+821012345678"
+                placeholder="010-1234-5678"
                 value={phoneNumber}
                 onChange={(event) => {
                   requestAttemptRef.current += 1;
                   requestPendingRef.current = false;
                   setIsRequesting(false);
-                  setPhoneNumber(event.target.value);
+                  setPhoneNumber(formatKoreanMobile(event.target.value));
                   setRequestError(null);
                 }}
                 aria-invalid={requestError ? true : undefined}
@@ -287,7 +302,7 @@ export default function AuthPage() {
               />
             </label>
             <p id="phone-help" className="m-0 mt-2 text-[length:var(--type-meta)] leading-4 text-[var(--fg-muted)]">
-              국가 코드를 포함해 입력해 주세요. 예: +821012345678
+              010-으로 시작하는 휴대전화 번호를 입력해 주세요.
             </p>
             {requestError ? (
               <p id="phone-error" className="m-0 mt-3 text-[length:var(--type-body)] leading-5 text-[var(--fg-critical)]" role="alert">

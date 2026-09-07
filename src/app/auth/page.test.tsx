@@ -143,6 +143,7 @@ describe("AuthPage", () => {
 
     expect(screen.getByRole("heading", { name: "24시간 안에 안전하게 만나는 소규모 모임" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "휴대전화로 시작하기" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "휴대전화 번호" })).toHaveValue("010-");
     expect(screen.getByText("만 18세 이상만 이용할 수 있어요.")).toBeInTheDocument();
     expect(screen.queryByText(/데이트|유료 행사|장기 동호회/)).not.toBeInTheDocument();
   });
@@ -193,7 +194,7 @@ describe("AuthPage", () => {
 
     requestCode();
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "국가 코드를 포함한 올바른 휴대전화 번호를 입력해 주세요.",
+      "010-으로 시작하는 휴대전화 번호 11자리를 입력해 주세요.",
     );
 
     requestCode();
@@ -253,7 +254,7 @@ describe("AuthPage", () => {
       });
     });
 
-    expect(screen.getByRole("textbox", { name: "휴대전화 번호" })).toHaveValue("+821055555555");
+    expect(screen.getByRole("textbox", { name: "휴대전화 번호" })).toHaveValue("010-5555-5555");
     expect(screen.queryByRole("heading", { name: "인증번호를 입력해 주세요" })).not.toBeInTheDocument();
   });
 
@@ -288,7 +289,7 @@ describe("AuthPage", () => {
     await screen.findByRole("heading", { name: "인증번호를 입력해 주세요" });
     fireEvent.click(screen.getByRole("button", { name: "번호 수정" }));
 
-    expect(screen.getByRole("textbox", { name: "휴대전화 번호" })).toHaveValue("+821012345678");
+    expect(screen.getByRole("textbox", { name: "휴대전화 번호" })).toHaveValue("010-1234-5678");
     expect(screen.getByRole("textbox", { name: "휴대전화 번호" })).toHaveFocus();
   });
 
@@ -359,7 +360,7 @@ describe("AuthPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "인터넷 연결이 끊겨 인증번호를 요청할 수 없어요",
     );
-    expect(screen.getByRole("textbox", { name: "휴대전화 번호" })).toHaveValue("+821012345678");
+    expect(screen.getByRole("textbox", { name: "휴대전화 번호" })).toHaveValue("010-1234-5678");
     expect(screen.getByRole("textbox", { name: "휴대전화 번호" })).toHaveFocus();
 
     setOnline(true);
