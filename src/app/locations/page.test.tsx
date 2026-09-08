@@ -95,36 +95,15 @@ describe("LocationsPage", () => {
     });
   });
 
-  it("announces empty searches and browser permission failures without changing the draft", async () => {
-    let rejectPosition: PositionErrorCallback | undefined;
-    Object.defineProperty(navigator, "geolocation", {
-      configurable: true,
-      value: {
-        getCurrentPosition: (
-          _resolve: PositionCallback,
-          reject: PositionErrorCallback,
-        ) => {
-          rejectPosition = reject;
-        },
-      },
-    });
+  it("announces empty searches without requesting location permission", async () => {
     render(<LocationsPage />);
 
     fireEvent.change(screen.getByRole("searchbox", { name: "동네 검색" }), {
       target: { value: "없는 동네" },
     });
     expect(screen.getByText("검색 결과가 없어요. 다른 동네 이름을 입력해 주세요.")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "확인" }));
-    expect(screen.getByText("현재 위치 권한을 확인하는 중이에요.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "다시 확인" })).toBeDisabled();
-
-    rejectPosition?.({ code: 1 } as GeolocationPositionError);
-    await waitFor(() => {
-      expect(
-        screen.getByText("현재 위치 권한이 꺼져 있어요. 브라우저 설정에서 허용하거나 동네를 직접 선택해 주세요."),
-      ).toBeInTheDocument();
-    });
+    expect(screen.queryByRole("button", { name: "확인" })).not.toBeInTheDocument();
+    expect(screen.queryByText("현재 위치 권한")).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole("searchbox", { name: "동네 검색" }), {
       target: { value: "" },
     });

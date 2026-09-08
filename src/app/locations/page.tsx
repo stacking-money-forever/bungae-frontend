@@ -19,23 +19,6 @@ import {
 } from "@/components/home-surface";
 import { setNavigationIntent } from "@/components/navigation-intent";
 
-type LocationPermissionStatus =
-  | "idle"
-  | "checking"
-  | "granted"
-  | "denied"
-  | "error"
-  | "unsupported";
-
-const locationPermissionMessages: Record<LocationPermissionStatus, string> = {
-  idle: "현재 위치 권한은 선택 사항이에요. 목록에서 동네를 직접 선택할 수 있어요.",
-  checking: "현재 위치 권한을 확인하는 중이에요.",
-  granted: "현재 위치를 확인했어요. 이 화면에서는 동네 이름을 직접 선택해 주세요.",
-  denied: "현재 위치 권한이 꺼져 있어요. 브라우저 설정에서 허용하거나 동네를 직접 선택해 주세요.",
-  error: "현재 위치를 확인하지 못했어요. 동네를 직접 선택해 주세요.",
-  unsupported: "이 브라우저에서는 현재 위치를 확인할 수 없어요. 동네를 직접 선택해 주세요.",
-};
-
 function LocationsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -43,8 +26,6 @@ function LocationsPageContent() {
   const [draftLocation, setDraftLocation] = useState(initialFilters.location);
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(true);
-  const [locationPermissionStatus, setLocationPermissionStatus] =
-    useState<LocationPermissionStatus>("idle");
   const sourceFiltersRef = useRef(initialFilters);
   const destinationLocationRef = useRef(initialFilters.location);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -64,20 +45,6 @@ function LocationsPageContent() {
     setDraftLocation(nextFilters.location);
   }, [searchKey]);
   const previewFilters = { ...sourceFiltersRef.current, location: draftLocation };
-
-  const checkLocationPermission = () => {
-    if (!navigator.geolocation) {
-      setLocationPermissionStatus("unsupported");
-      return;
-    }
-
-    setLocationPermissionStatus("checking");
-    navigator.geolocation.getCurrentPosition(
-      () => setLocationPermissionStatus("granted"),
-      (error) => setLocationPermissionStatus(error.code === 1 ? "denied" : "error"),
-      { enableHighAccuracy: false, maximumAge: 60_000, timeout: 8_000 },
-    );
-  };
 
   const navigateHome = () => {
     const targetFilters = {
@@ -133,24 +100,6 @@ function LocationsPageContent() {
             onChange={(event) => setQuery(event.target.value)}
           />
         </label>
-
-        <div className="mt-3 flex items-center gap-3 rounded-[12px] bg-[var(--bg-layer-default)] px-3 py-2">
-          <MapPin className="shrink-0 text-[var(--fg-muted)]" size={18} strokeWidth={1.8} aria-hidden="true" />
-          <div className="min-w-0 flex-1">
-            <p className="m-0 text-[13px] font-semibold leading-5 text-[var(--fg-neutral)]">현재 위치 권한</p>
-            <p className="m-0 text-[12px] leading-4 text-[var(--fg-muted)]" role="status" aria-live="polite">
-              {locationPermissionMessages[locationPermissionStatus]}
-            </p>
-          </div>
-          <button
-            className="min-h-[44px] shrink-0 rounded-[8px] px-2 text-[13px] font-bold text-[var(--fg-neutral)] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
-            type="button"
-            onClick={checkLocationPermission}
-            disabled={locationPermissionStatus === "checking"}
-          >
-            {locationPermissionStatus === "idle" ? "확인" : "다시 확인"}
-          </button>
-        </div>
 
         <button
           className="mt-3 flex min-h-[48px] w-full items-center gap-3 rounded-[12px] bg-[var(--bg-layer-default)] px-3 text-left text-[14px] font-semibold text-[var(--fg-neutral)] focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"

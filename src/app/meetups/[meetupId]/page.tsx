@@ -325,20 +325,12 @@ export default function MeetupDetailPage() {
     Number(hasQuorumDecisionAction) +
     Number(hasCheckInAction);
   const bottomActionCount = authenticatedActionCount;
-  const bottomActionSpacingClass =
-    bottomActionCount === 2
-      ? "pb-[calc((var(--action-primary-height)*2)+var(--dimension-x2)+var(--dimension-x3)+var(--dimension-x6))]"
-      : bottomActionCount === 3
-        ? "pb-[calc((var(--action-primary-height)*3)+(var(--dimension-x2)*2)+var(--dimension-x3)+var(--dimension-x6))]"
-        : bottomActionCount === 4
-          ? "pb-[calc((var(--action-primary-height)*4)+(var(--dimension-x2)*3)+var(--dimension-x3)+var(--dimension-x6))]"
-          : bottomActionCount === 5
-            ? "pb-[calc((var(--action-primary-height)*5)+(var(--dimension-x2)*4)+var(--dimension-x3)+var(--dimension-x6))]"
-            : undefined;
+  const venueName = currentMeetup?.venue.name?.trim() || null;
+  const venueAddress = currentMeetup?.venue.address?.trim() || null;
+  const hasAuthorizedVenue = Boolean(venueName || venueAddress);
   return (
     <ScreenShell
-      bottomSpacing={bottomActionCount === 1}
-      className={bottomActionSpacingClass}
+      actionCount={bottomActionCount}
       aria-label="모임 상세"
     >
       <TopNavigation
@@ -392,16 +384,27 @@ export default function MeetupDetailPage() {
         </dl>
 
         <div className="mt-3 flex items-start gap-3 rounded-[12px] bg-[var(--bg-neutral-weak)] px-4 py-3">
-          <LockKeyhole
-            className="mt-0.5 shrink-0 text-[var(--fg-muted)]"
-            size={28}
-            strokeWidth={1.8}
-            aria-hidden="true"
-          />
+          {hasAuthorizedVenue ? (
+            <MapPin
+              className="mt-0.5 shrink-0 text-[var(--fg-muted)]"
+              size={28}
+              strokeWidth={1.8}
+              aria-hidden="true"
+            />
+          ) : (
+            <LockKeyhole
+              className="mt-0.5 shrink-0 text-[var(--fg-muted)]"
+              size={28}
+              strokeWidth={1.8}
+              aria-hidden="true"
+            />
+          )}
           <div className="min-w-0">
-            <p className="m-0 text-[length:var(--type-title)] font-bold leading-5">공개 장소</p>
-            <p className="m-0 mt-1 text-[length:var(--type-body)] leading-[22px] text-[var(--fg-muted)]">
-              정확한 장소는 참여 확정 후 공개해요.
+            <p className="m-0 text-[length:var(--type-title)] font-bold leading-5">{hasAuthorizedVenue ? "모임 장소" : "공개 장소"}</p>
+            <p className="m-0 mt-1 break-words text-[length:var(--type-body)] leading-[22px] text-[var(--fg-muted)] [overflow-wrap:anywhere]">
+              {hasAuthorizedVenue
+                ? [venueName, venueAddress].filter(Boolean).join(" · ")
+                : "정확한 장소는 참여 확정 후 공개해요."}
             </p>
           </div>
         </div>
@@ -414,7 +417,7 @@ export default function MeetupDetailPage() {
               strokeWidth={1.8}
               aria-hidden="true"
             />
-            <span className="text-[length:var(--type-section)] font-semibold leading-6">참가자 본인 인증 100%</span>
+            <span className="text-[length:var(--type-section)] font-semibold leading-6">본인 인증이 된 사람과 만나요</span>
           </li>
           <li className="flex min-h-[42px] items-center gap-3">
             <MapPin
@@ -433,7 +436,7 @@ export default function MeetupDetailPage() {
               aria-hidden="true"
             />
             <span className="text-[length:var(--type-section)] font-semibold leading-6">
-              평점 없이 본인 인증으로 만나요
+              평점 없이 만나요
             </span>
           </li>
         </ul>
@@ -461,7 +464,7 @@ export default function MeetupDetailPage() {
                 신고하기
               </button>
               <p className="m-0 flex min-h-[48px] items-center px-3 text-[length:var(--type-body)] leading-5 text-[var(--fg-muted)]">
-                제안자 계정 ID가 이 모임 계약에 없어 여기서 차단할 수 없어요.
+                제안자 정보가 없어 여기서 차단할 수 없어요.
               </p>
             </div>
             {activeReported ? (

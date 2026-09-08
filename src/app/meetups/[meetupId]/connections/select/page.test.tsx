@@ -188,7 +188,9 @@ describe("ConnectionSelectPage", () => {
 
     await act(async () => submitted.resolve({ results: [{ targetUserId: "checked", state: "MATCHED", connectionId: "connection-1" }] }));
     expect(await screen.findByText("상호 연결됐어요.")).toBeInTheDocument();
-    expect(screen.getByText("MATCHED · connection-1")).toBeInTheDocument();
+    expect(screen.getByText("서로 연결됐어요")).toBeInTheDocument();
+    expect(screen.queryByText(/connection-1/)).not.toBeInTheDocument();
+    expect(screen.queryByText("MATCHED")).not.toBeInTheDocument();
   });
 
   it("keeps PENDING private and displays MATCHED only from the returned result", async () => {
@@ -202,7 +204,8 @@ describe("ConnectionSelectPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "서윤" }));
     fireEvent.click(screen.getByRole("button", { name: "선택 완료" }));
     expect(await screen.findByText("선택을 저장했어요. 상대에게 공개되지 않아요.")).toBeInTheDocument();
-    expect(screen.getByText("PENDING")).toBeInTheDocument();
+    expect(screen.getByText("상대에게는 아직 보이지 않아요")).toBeInTheDocument();
+    expect(screen.queryByText("PENDING")).not.toBeInTheDocument();
     expect(screen.queryByText("상호 연결됐어요.")).not.toBeInTheDocument();
   });
 
@@ -223,7 +226,7 @@ describe("ConnectionSelectPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("선택을 저장하지 못했어요. 다시 시도해 주세요.");
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
-    expect(await screen.findByText("PENDING")).toBeInTheDocument();
+    expect(await screen.findByText("상대에게는 아직 보이지 않아요")).toBeInTheDocument();
     expect(api.createConnectionIntent).toHaveBeenLastCalledWith("demo", { targetUserIds: ["checked"] }, "access");
   });
 

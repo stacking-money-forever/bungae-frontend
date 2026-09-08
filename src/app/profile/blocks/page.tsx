@@ -172,11 +172,11 @@ export default function BlocksPage() {
   return (
     <ScreenShell className="px-5 pb-8">
       <TopNavigation href="/profile" title="차단 관리" />
-      <main>
+      <section>
         <section className="mt-6">
           <div className="flex items-start gap-3 bg-[var(--bg-neutral-weak)] px-4 py-3">
             <Info size={22} aria-hidden="true" />
-            <p className="m-0">차단한 계정은 이름과 프로필을 제공하지 않는 서버 계약으로 관리돼요.</p>
+            <p className="m-0">차단한 계정은 이름과 프로필 없이 서버에서 관리돼요.</p>
           </div>
 
           <OfflineNotice />
@@ -224,7 +224,7 @@ export default function BlocksPage() {
             </div>
           ) : null}
         </section>
-      </main>
+      </section>
 
       <AnimatedDialog
         open={currentPending.block !== null}

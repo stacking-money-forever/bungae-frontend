@@ -11,7 +11,7 @@ export function BottomActionBar({
   ...rest
 }: BottomActionBarProps) {
   const actionBarClassName = [
-    "bottom-action-bar fixed inset-x-0 bottom-0 z-10 mx-auto flex w-full max-w-[var(--screen-product-width)] flex-col items-stretch gap-[var(--dimension-x2)] border-t border-[var(--stroke-neutral)] bg-[var(--bg-layer-floating)] px-[var(--dimension-x5)] pt-[var(--dimension-x3)] pb-[max(var(--dimension-x6),env(safe-area-inset-bottom))]",
+    "bottom-action-bar fixed inset-x-0 bottom-0 z-10 mx-auto flex w-full max-w-[var(--screen-product-width)] flex-col items-stretch gap-[var(--dimension-x2)] border-t border-[var(--stroke-neutral)] bg-[var(--bg-layer-floating)] px-[var(--dimension-x5)] pt-[var(--dimension-x3)] pb-[max(var(--dimension-x6),var(--safe-area-bottom))]",
     className,
   ]
     .filter(Boolean)

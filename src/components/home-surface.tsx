@@ -199,9 +199,18 @@ export function homeFiltersToMeetupQuery(
 }
 
 function meetupRow(meetup: Meetup): MeetupListRowProps {
+  const imageByActivity: Record<string, { src: string; alt: string }> = {
+    WALK: { src: "/images/meetups/han-river-walk-grid.jpg", alt: "한강 산책 모임" },
+    COFFEE: { src: "/images/meetups/cafe-chat-grid.jpg", alt: "카페 대화 모임" },
+    BOARD_GAME: { src: "/images/meetups/board-game-grid.jpg", alt: "보드게임 모임" },
+  };
+  const image = imageByActivity[meetup.activityCode] ?? {
+    src: "/images/meetups/cafe-chat-grid.jpg",
+    alt: "공개 장소 모임",
+  };
   return {
-    imageSrc: "/images/meetups/han-river-walk-grid.jpg",
-    imageAlt: "공개 장소 모임",
+    imageSrc: image.src,
+    imageAlt: image.alt,
     time: new Intl.DateTimeFormat("ko-KR", {
       hour: "2-digit",
       minute: "2-digit",

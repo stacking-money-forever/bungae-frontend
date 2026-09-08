@@ -25,10 +25,17 @@
   --dimension-x4: 16px;
   --dimension-x5: 20px;
   --dimension-x6: 24px;
-  --screen-product-width: 390px;
+  --screen-product-width: 430px;
   --target-min: 44px;
   --action-primary-height: 52px;
   --home-list-row: 64px;
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --tab-bar-content-height: 76px;
+  --tab-bar-occupied-height: calc(var(--tab-bar-content-height) + var(--safe-area-bottom));
+  --action-bar-stack-height: calc(var(--action-primary-height) + var(--dimension-x3) + var(--dimension-x6) + 1px);
+  --action-bar-occupied-height: calc(var(--action-primary-height) + var(--dimension-x3) + max(var(--dimension-x6), var(--safe-area-bottom)) + 1px);
+  --occupied-bottom: 0px;
   --font-display: "Do Hyeon", sans-serif;
   --font-body: "Gowun Dodum", sans-serif;
   --type-wordmark: 18px;
@@ -218,9 +225,28 @@ label:has(input:not(:disabled)):active {
   position: sticky;
   top: 0;
   z-index: 9;
+  min-height: calc(64px + var(--safe-area-top));
+  padding-top: var(--safe-area-top);
   background: color-mix(in srgb, var(--bg-layer-default) 94%, transparent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+}
+
+html:has(.persistent-bottom-navigation) {
+  --occupied-bottom: var(--tab-bar-occupied-height);
+}
+
+html:has(.bottom-action-bar):not(:has(.persistent-bottom-navigation)) {
+  --occupied-bottom: var(--action-bar-occupied-height);
+}
+
+html:has(.persistent-bottom-navigation):has(.bottom-action-bar) {
+  --occupied-bottom: calc(var(--tab-bar-occupied-height) + var(--action-bar-stack-height));
+}
+
+html:has(.persistent-bottom-navigation) .bottom-action-bar {
+  bottom: var(--tab-bar-occupied-height);
+  padding-bottom: var(--dimension-x6);
 }
 
 .root-header-action__surface {
@@ -320,9 +346,7 @@ label:has(input:not(:disabled)):active {
 }
 
 .meetup-feed {
-  padding-bottom: calc(
-    76px + 48px + var(--dimension-x4) + env(safe-area-inset-bottom)
-  );
+  padding-bottom: calc(var(--occupied-bottom) + 48px + var(--dimension-x4));
 }
 
 .meetup-section {
@@ -437,7 +461,7 @@ label:has(input:not(:disabled)):active {
     var(--dimension-x4),
     calc((100vw - var(--screen-product-width)) / 2 + var(--dimension-x4))
   );
-  bottom: calc(76px + env(safe-area-inset-bottom));
+  bottom: var(--occupied-bottom);
   z-index: 11;
   display: inline-flex;
   min-height: 48px;
@@ -456,14 +480,14 @@ label:has(input:not(:disabled)):active {
 .bottom-navigation {
   position: absolute;
   right: 0;
-  bottom: 0;
+  bottom: var(--safe-area-bottom);
   left: 0;
   z-index: 1;
   display: flex;
-  height: 76px;
+  height: var(--tab-bar-content-height);
   align-items: stretch;
   gap: var(--dimension-x1);
-  padding: 8px var(--dimension-x4) max(8px, env(safe-area-inset-bottom));
+  padding: 8px var(--dimension-x4);
   border-top: 1px solid var(--stroke-neutral);
   background: var(--bg-layer-floating);
   box-shadow: 0 -8px 18px rgb(22 22 22 / 8%);
@@ -514,7 +538,7 @@ label:has(input:not(:disabled)):active {
   outline-offset: 3px;
 }
 
-@media (min-width: 391px) {
+@media (min-width: 431px) {
   .home-shell {
     border-inline: 1px solid var(--stroke-neutral);
   }

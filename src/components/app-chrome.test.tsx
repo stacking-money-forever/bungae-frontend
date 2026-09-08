@@ -20,6 +20,7 @@ describe("shared app chrome", () => {
       </ScreenShell>,
     );
 
+    expect(container.querySelectorAll("main")).toHaveLength(1);
     expect(container.querySelector(".top-navigation")).toBeInTheDocument();
     expect(screen.getByRole("contentinfo", { name: "화면 주요 행동" })).toHaveClass(
       "bottom-action-bar",
@@ -34,8 +35,11 @@ describe("shared app chrome", () => {
     expect(stickyHeaderRule).not.toContain("border-bottom");
     expect(stickyHeaderRule).not.toContain("box-shadow");
     expect(css).toMatch(/\.bottom-action-bar \{[\s\S]*box-shadow/);
-    expect(css).toMatch(/\.create-fab \{[\s\S]*bottom: calc\(76px/);
-    expect(css).toMatch(/\.meetup-feed \{[\s\S]*76px \+ 48px/);
+    expect(css).toMatch(/--occupied-bottom:/);
+    expect(css).toMatch(/\.create-fab \{[\s\S]*bottom: var\(--occupied-bottom\)/);
+    expect(css).toMatch(/\.meetup-feed \{[\s\S]*var\(--occupied-bottom\)/);
+    expect(css).toMatch(/--tab-bar-occupied-height:/);
+    expect(css).toMatch(/min-height: calc\(64px \+ var\(--safe-area-top\)\)/);
     expect(css).toMatch(/\.route-gesture-surface--foreground \{[\s\S]*width: min\(100%, var\(--screen-product-width\)\)/);
   });
 });

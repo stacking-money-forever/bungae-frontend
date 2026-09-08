@@ -191,7 +191,7 @@ function NewMeetupPageContent() {
   }, [sessionKey, subject]);
   if (!subject) {
     return (
-      <ScreenShell bottomSpacing aria-label="로그인 필요">
+      <ScreenShell bottomSpacing reserveTabBar aria-label="로그인 필요">
         <TopNavigation href="/" title="모임 만들기" />
         <section className="px-[var(--dimension-x5)] pb-8 pt-12" aria-labelledby="create-auth-heading">
           <h2 id="create-auth-heading" className="m-0 font-display text-[length:var(--type-headline)] font-normal leading-8 text-[var(--fg-neutral)]">
@@ -252,8 +252,7 @@ function NewMeetupPageContent() {
     mutationRef.current = null;
     setMutationProblem(null);
     setValues((current) => ({ ...current, [id]: value }));
-    if (id === "start" || id === "end") clearErrors("start", "end", "deadline");
-    else if (id === "deadline") clearErrors("deadline");
+    if (id === "start" || id === "end") clearErrors("start", "end");
     else if (id === "minimum" || id === "capacity") clearErrors("minimum", "capacity");
     else if (id === "title") clearErrors("title");
     else if (id === "place") clearErrors("place");
@@ -267,7 +266,7 @@ function NewMeetupPageContent() {
     if (firstError) {
       setErrors(nextErrors);
       window.requestAnimationFrame(() => document.getElementById(
-        firstError === "start" || firstError === "end" || firstError === "deadline" ? `${firstError}-trigger` : firstError === "place" ? "place-trigger" : firstError,
+        firstError === "start" || firstError === "end" ? `${firstError}-trigger` : firstError === "place" ? "place-trigger" : firstError,
       )?.focus());
       return;
     }
@@ -336,7 +335,7 @@ function NewMeetupPageContent() {
 
   if (createdMeetup) {
     return (
-      <ScreenShell bottomSpacing aria-label="모임 게시 완료">
+      <ScreenShell bottomSpacing reserveTabBar aria-label="모임 게시 완료">
         <TopNavigation href="/meetups/new" title="게시 완료" />
         <OfflineNotice className="mx-5 mt-5" />
         <ResultSection
@@ -367,7 +366,7 @@ function NewMeetupPageContent() {
   const errorMessages = Object.values(errors);
 
   return (
-    <ScreenShell bottomSpacing aria-label="모임 만들기 검토">
+    <ScreenShell bottomSpacing reserveTabBar aria-label="모임 만들기 검토">
       <TopNavigation className="sticky top-0 z-20 border-b border-[var(--stroke-neutral)] bg-[var(--bg-layer-default)]" href="/" title="모임 만들기" />
       <form className="px-[var(--dimension-x5)] pb-8 pt-5" id="create-meetup-form" noValidate onSubmit={postMeetup} aria-busy={isPosting}>
         <OfflineNotice className="mb-4" />
@@ -426,7 +425,7 @@ function NewMeetupPageContent() {
             {placeResults.length > 0 ? <div role="radiogroup" aria-label="서버 장소 검색 결과">{placeResults.map((place) => (
               <label key={place.providerPlaceId} className="flex gap-2 border-b border-[var(--stroke-neutral)] py-2">
                 <input type="radio" name="provider-place" checked={providerPlace?.providerPlaceId === place.providerPlaceId} onChange={() => { setProviderPlace(place); setPublicPlaceConfirmed(false); }} />
-                <span><strong>{place.name}</strong><br />{place.category} · {place.roadAddress || place.address}</span>
+                <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]"><strong>{place.name}</strong><br />{place.category} · {place.roadAddress || place.address}</span>
               </label>
             ))}</div> : null}
             {providerPlace ? <><StatusBanner tone="positive" label={providerPlace.name} description={`${providerPlace.category} · ${providerPlace.roadAddress || providerPlace.address}`} /><label className="flex gap-2 text-[13px]"><input type="checkbox" checked={publicPlaceConfirmed} onChange={(event) => setPublicPlaceConfirmed(event.target.checked)} />누구나 접근할 수 있는 공개 장소임을 확인했어요.</label></> : null}
@@ -442,8 +441,6 @@ function NewMeetupPageContent() {
           <TextField id="costAlcohol" label="비용·음주" value={values.costAlcohol} placeholder="예: 무료 · 음주 없음" onChange={(value) => updateValue("costAlcohol", value)} />
           <TextField id="preparation" label="준비물" value={values.preparation} placeholder="없으면 비워 두세요" multiline onChange={(value) => updateValue("preparation", value)} />
           <TextField id="facilitationTemplate" label="진행 방식" value={values.facilitationTemplate} placeholder="예: 자유 진행" error={errors.facilitationTemplate} onChange={(value) => updateValue("facilitationTemplate", value)} />
-
-          <TimeWheelPicker id="deadline" label="성사 여부를 확정할 시간" value={values.deadline} options={timeOptions} error={errors.deadline} onChange={(value) => updateValue("deadline", value)} />
         </fieldset>
 
         <StatusBanner className="mt-4 rounded-[12px]" tone="positive" label="만들면 바로 첫 참가자 1명으로 시작해요." />
