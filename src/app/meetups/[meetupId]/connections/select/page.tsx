@@ -11,6 +11,11 @@ import { TopNavigation } from "@/components/top-navigation";
 import { ApiProblemError } from "@/lib/api/client";
 import { useAuthSession } from "@/lib/auth/auth-session-provider";
 import type { ConnectionIntentResult, Participant } from "@/lib/api/types";
+import {
+  chromeButtonClassName,
+  chromePrimaryButtonClassName,
+  connectionIntentStateLabel,
+} from "@/lib/ui/connection-copy";
 
 type LoadState = "loading" | "ready" | "error";
 
@@ -160,12 +165,12 @@ export default function ConnectionSelectPage() {
       <TopNavigation href={`/meetups/${encodeURIComponent(meetupId)}`} title={<span>다시 연결하기</span>} />
       <div className="flex flex-1 flex-col px-5 pb-8">
         <h1 className="mt-7 text-xl font-bold">다시 이야기하고 싶은 사람이 있나요?</h1>
-        <p>체크인한 참가자만 보여요. PENDING 선택은 상대에게 공개되지 않아요.</p>
+        <p>체크인한 참가자만 보여요. 한쪽만 선택한 상태는 상대에게 보이지 않아요.</p>
         {loadState === "loading" ? <p role="status">참가자를 불러오는 중이에요.</p> : null}
         {loadState === "error" ? (
           <div role="alert">
             <p>{loadError}</p>
-            <button type="button" onClick={retryInitial}>다시 시도</button>
+            <button className={chromeButtonClassName} type="button" onClick={retryInitial}>다시 시도</button>
           </div>
         ) : null}
         {loadState === "ready" && visible.length === 0 ? <p role="status">선택할 체크인 참가자가 없어요.</p> : null}
@@ -174,7 +179,7 @@ export default function ConnectionSelectPage() {
             const checked = selected.includes(member.userId);
             return (
               <li key={member.userId}>
-                <button type="button" aria-pressed={checked} onClick={() => toggle(member.userId)}>
+                <button className={`${chromeButtonClassName} mt-2 w-full justify-between gap-2`} type="button" aria-pressed={checked} onClick={() => toggle(member.userId)}>
                   <span>{member.displayName}</span>
                   {checked ? <Check aria-hidden="true" /> : <Plus aria-hidden="true" />}
                 </button>
@@ -182,29 +187,31 @@ export default function ConnectionSelectPage() {
             );
           })}
         </ul>
-        {cursor ? <button type="button" disabled={isAppending} onClick={loadMore}>{isAppending ? "더 불러오는 중..." : "더 보기"}</button> : null}
+        {cursor ? <button className={`${chromeButtonClassName} mt-3 w-full`} type="button" disabled={isAppending} onClick={loadMore}>{isAppending ? "더 불러오는 중..." : "더 보기"}</button> : null}
         {appendError ? (
           <div role="alert">
             <p>{appendError}</p>
-            <button type="button" onClick={loadMore}>더 보기 재시도</button>
+            <button className={chromeButtonClassName} type="button" onClick={loadMore}>더 보기 재시도</button>
           </div>
         ) : null}
         {submitError ? (
           <div role="alert">
             <p>{submitError}</p>
-            <button type="button" onClick={submit}>다시 시도</button>
+            <button className={chromeButtonClassName} type="button" onClick={submit}>다시 시도</button>
           </div>
         ) : null}
         {result ? (
           <section role="status" tabIndex={-1}>
             <p>{matched.length ? "상호 연결됐어요." : "선택을 저장했어요. 상대에게 공개되지 않아요."}</p>
-            {result.results.map((item) => <p key={item.targetUserId}>{item.state}{item.connectionId ? ` · ${item.connectionId}` : ""}</p>)}
-            <Link href="/connections">연결 목록으로</Link>
+            {result.results.map((item) => (
+              <p key={item.targetUserId}>{connectionIntentStateLabel(item.state)}</p>
+            ))}
+            <Link className={`${chromePrimaryButtonClassName} mt-3`} href="/connections">연결 목록으로</Link>
           </section>
         ) : null}
       </div>
       <BottomActionBar>
-        <button type="button" disabled={submitting || selected.length === 0 || Boolean(result)} onClick={submit}>
+        <button className={chromePrimaryButtonClassName} type="button" disabled={submitting || selected.length === 0 || Boolean(result)} onClick={submit}>
           {submitting ? "저장 중..." : "선택 완료"}
         </button>
       </BottomActionBar>

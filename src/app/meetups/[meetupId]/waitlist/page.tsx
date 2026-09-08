@@ -20,7 +20,7 @@ export default function WaitlistResultPage() {
           대기 등록 결과를 확인할 수 없어요
         </h2>
         <p className="m-0 mt-4 text-[length:var(--type-body)] leading-[22px] text-[var(--fg-muted)]">
-          이 주소에는 대기 등록 결과나 대기 순서를 복원할 서버 계약이 없어요. 모임 상세에서 최신 상태를 확인해 주세요.
+          이 주소에서는 대기 등록 결과나 대기 순서를 확인할 수 없어요. 모임 상세에서 최신 상태를 확인해 주세요.
         </p>
       </section>
       <BottomActionBar>

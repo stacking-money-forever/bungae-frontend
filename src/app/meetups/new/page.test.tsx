@@ -59,14 +59,6 @@ describe("NewMeetupPage", () => {
       minimum: "최소 성사 인원은 2명 이상이어야 해요.",
       capacity: "정원은 최소 인원 이상, 최대 8명이어야 해요.",
     });
-
-    expect(
-      validateMeetupForm({
-        ...initialValues,
-        deadline: "offset-180",
-      }),
-    ).toMatchObject({
-      deadline: "확정 마감은 시작 시간보다 늦을 수 없어요.",
-    });
+    expect(validateMeetupForm(initialValues)).not.toHaveProperty("deadline");
   });
 });

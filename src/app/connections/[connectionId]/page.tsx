@@ -36,7 +36,7 @@ export default function ConnectionDetailPage() {
           연결 상세를 확인할 수 없어요
         </h1>
         <p className="m-0 mt-4 text-[length:var(--type-body)] leading-[22px] text-[var(--fg-muted)]">
-          이 화면은 연결 한 건의 상세 계약이 제공되면 상대 정보와 함께 표시돼요. 지금은 연결 목록에서 확인한 정보만 제공되고 있어요.
+          이 화면은 연결 한 건의 자세한 정보가 준비되면 상대와 함께 표시돼요. 지금은 연결 목록에서 확인한 정보만 볼 수 있어요.
         </p>
       </section>
 
@@ -55,7 +55,7 @@ export default function ConnectionDetailPage() {
           ) : null}
           {reportUnavailable || blockUnavailable ? (
             <li className="rounded-[12px] bg-[var(--bg-neutral-weak)] px-4 py-3 text-[length:var(--type-body)] leading-[22px] text-[var(--fg-muted)]">
-              상대 신고·차단은 상대 정보 계약이 제공된 뒤 가능해요.
+              상대 신고·차단은 상대 정보가 준비된 뒤에 이용할 수 있어요.
             </li>
           ) : null}
         </ul>

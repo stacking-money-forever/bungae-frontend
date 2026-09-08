@@ -186,7 +186,7 @@ export default function WithdrawalPage() {
   return (
     <ScreenShell className="px-5 pb-8">
       <TopNavigation href="/profile" title={<span className="font-display text-[16px] font-normal leading-6">계정 탈퇴</span>} className="-mx-5 px-4" />
-      <main className="pt-6" aria-labelledby="withdrawal-heading">
+      <section className="pt-6" aria-labelledby="withdrawal-heading">
         <section className="rounded-2xl bg-[var(--bg-layer-floating)] p-4" aria-labelledby="withdrawal-heading">
           <div className="flex items-start gap-3">
             <ShieldAlert className="mt-0.5 shrink-0 text-[var(--fg-neutral)]" size={24} strokeWidth={1.8} aria-hidden="true" />
@@ -213,7 +213,7 @@ export default function WithdrawalPage() {
 
         {error && loadState !== "error" ? <section className="mt-4 grid gap-3" aria-labelledby="withdrawal-mutation-error"><p id="withdrawal-mutation-error" className="m-0 text-[14px] leading-5 text-[var(--fg-neutral)]" role="alert">{error}</p><button type="button" onClick={() => scheduled ? setCancelDialogOpen(true) : setScheduleDialogOpen(true)} disabled={isPending} className="inline-flex min-h-[44px] items-center justify-center gap-2 border border-[var(--stroke-neutral)] px-3 text-[14px] font-bold text-[var(--fg-neutral)] disabled:opacity-60"><AlertTriangle size={18} aria-hidden="true" />다시 시도</button></section> : null}
         {notice ? <p ref={successRef} tabIndex={-1} className="mt-4 flex gap-2 text-[14px] leading-5 text-[var(--fg-neutral)] outline-none" role="status"><CheckCircle2 className="shrink-0" size={20} aria-hidden="true" />{notice}</p> : null}
-      </main>
+      </section>
     </ScreenShell>
   );
 }

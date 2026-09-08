@@ -21,7 +21,7 @@ export function TopNavigation({
   ...rest
 }: TopNavigationProps) {
   const navigationClassName = [
-    "top-navigation flex min-h-[64px] w-full shrink-0 items-center gap-[var(--dimension-x2)] px-[var(--dimension-x5)]",
+    "top-navigation flex min-h-[calc(64px+var(--safe-area-top))] w-full shrink-0 items-center gap-[var(--dimension-x2)] px-[var(--dimension-x5)]",
     className,
   ]
     .filter(Boolean)

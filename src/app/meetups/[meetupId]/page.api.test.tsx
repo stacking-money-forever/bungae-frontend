@@ -130,15 +130,14 @@ beforeEach(() => {
 });
 
 describe("authenticated meetup detail API", () => {
-  it("renders server state and allowed actions without exposing the returned exact venue", async () => {
+  it("renders server state, allowed actions, and authorized venue fields when present", async () => {
     const api = createApi();
     render(<AuthSessionProvider api={api}><SignedInDetail /></AuthSessionProvider>);
 
     expect(await screen.findByRole("heading", { name: "서버 한강 산책" })).toBeInTheDocument();
     expect(screen.getByText("서버 설명")).toBeInTheDocument();
-    expect(screen.getByText("공개 장소")).toBeInTheDocument();
-    expect(screen.queryByText("망원한강공원 3번 출입구")).not.toBeInTheDocument();
-    expect(screen.queryByText("서울특별시 마포구 비공개 12")).not.toBeInTheDocument();
+    expect(screen.getByText("모임 장소")).toBeInTheDocument();
+    expect(screen.getByText("망원한강공원 3번 출입구 · 서울특별시 마포구 비공개 12")).toBeInTheDocument();
     expect(screen.queryByText("37.5562")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "이 모임에 참여하기" })).toBeEnabled();
     expect(api.getMeetup).toHaveBeenCalledWith(meetup.id, "access");
@@ -166,6 +165,9 @@ describe("authenticated meetup detail API", () => {
 
     expect(await screen.findByRole("heading", { name: "서버 한강 산책" })).toBeInTheDocument();
     expect(screen.getByText("공개 장소")).toBeInTheDocument();
+    expect(screen.getByText("정확한 장소는 참여 확정 후 공개해요.")).toBeInTheDocument();
+    expect(screen.getByText("본인 인증이 된 사람과 만나요")).toBeInTheDocument();
+    expect(screen.queryByText("참가자 본인 인증 100%")).not.toBeInTheDocument();
     expect(screen.queryByText(/^undefined$/)).not.toBeInTheDocument();
   });
 
@@ -237,7 +239,7 @@ describe("authenticated meetup detail API", () => {
     const api = createApi({ getMeetup: vi.fn((id: string) => id === meetup.id ? Promise.resolve(meetup) : nextRouteResponse.promise) });
     const rendered = render(<AuthSessionProvider api={api}><SignedInDetail /></AuthSessionProvider>);
     expect(await screen.findByRole("heading", { name: "서버 한강 산책" })).toBeInTheDocument();
-    expect(screen.getByText("제안자 계정 ID가 이 모임 계약에 없어 여기서 차단할 수 없어요.")).toBeInTheDocument();
+    expect(screen.getByText("제안자 정보가 없어 여기서 차단할 수 없어요.")).toBeInTheDocument();
     routeId = nextRoute.id;
     rendered.rerender(<AuthSessionProvider api={api}><SignedInDetail /></AuthSessionProvider>);
     await act(async () => { nextRouteResponse.resolve(nextRoute); });

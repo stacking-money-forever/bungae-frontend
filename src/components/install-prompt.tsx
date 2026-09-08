@@ -98,7 +98,7 @@ export function InstallPrompt() {
         <div
           role="region"
           aria-label="앱 설치"
-          className="fixed inset-x-0 bottom-[calc(76px+env(safe-area-inset-bottom))] z-30 flex justify-center px-5"
+          className="install-prompt-banner fixed inset-x-0 bottom-[var(--occupied-bottom)] z-30 flex justify-center px-5"
         >
           <div className="flex w-full max-w-[var(--screen-product-width)] items-center gap-3 rounded-[16px] border border-[var(--stroke-neutral)] bg-[var(--bg-layer-floating)] p-4 shadow-[0_8px_24px_rgba(22,22,22,0.12)]">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[var(--brand-accent)] text-[20px]" aria-hidden="true">

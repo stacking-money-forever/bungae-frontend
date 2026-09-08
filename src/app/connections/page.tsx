@@ -9,6 +9,7 @@ import { TopNavigation } from "@/components/top-navigation";
 import { ApiProblemError } from "@/lib/api/client";
 import { useAuthSession } from "@/lib/auth/auth-session-provider";
 import type { ConnectionPage } from "@/lib/api/types";
+import { chromeButtonClassName } from "@/lib/ui/connection-copy";
 
 type Connection = ConnectionPage["items"][number];
 
@@ -154,13 +155,13 @@ export default function ConnectionsPage() {
     <ScreenShell className="px-5 pb-8">
       <TopNavigation href="/profile" title={<span>연결 목록</span>} />
       <h1>서로 선택한 사람만 연결돼요.</h1>
-      <p>연결 상세 화면은 아직 제공되지 않아요. 상세 확인을 누르면 안내 화면으로 이동해요.</p>
+      <p>연결 한 건의 자세한 화면은 아직 없어요. 상세 확인을 누르면 안내 화면으로 이동해요.</p>
       <h2 ref={titleRef} tabIndex={-1}>연결된 사람 {items.length}명</h2>
       {loading ? <p role="status">연결을 불러오는 중이에요.</p> : null}
       {loadError ? (
         <div role="alert">
           <p>{loadError}</p>
-          <button type="button" onClick={retryInitial}>다시 시도</button>
+            <button type="button" onClick={retryInitial} className={chromeButtonClassName}>다시 시도</button>
         </div>
       ) : null}
       {!loading && !loadError && items.length === 0 ? <p role="status">아직 연결된 사람이 없어요.</p> : null}
@@ -182,6 +183,7 @@ export default function ConnectionsPage() {
               trigger={(
                 <button
                   type="button"
+                  className={chromeButtonClassName}
                   ref={(node) => { actionRefs.current[item.connectionId] = node; }}
                   aria-label={`${item.counterpart.displayName}님과 연결 종료`}
                 >
@@ -191,23 +193,23 @@ export default function ConnectionsPage() {
             >
               <AnimatedDialogTitle>연결을 종료할까요?</AnimatedDialogTitle>
               <AnimatedDialogDescription>이 작업은 서버에서 연결을 삭제한 뒤에만 목록에 반영돼요.</AnimatedDialogDescription>
-              <AnimatedDialogClose asChild><button type="button">취소</button></AnimatedDialogClose>
-              <button type="button" disabled={deleting} onClick={end}>{deleting ? "종료 중..." : "연결 종료"}</button>
+              <AnimatedDialogClose asChild><button type="button" className={chromeButtonClassName}>취소</button></AnimatedDialogClose>
+              <button type="button" className={chromeButtonClassName} disabled={deleting} onClick={end}>{deleting ? "종료 중..." : "연결 종료"}</button>
             </AnimatedDialog>
           </li>
         ))}
       </ul>
-      {cursor ? <button type="button" disabled={isAppending} onClick={loadMore}>{isAppending ? "더 불러오는 중..." : "더 보기"}</button> : null}
+      {cursor ? <button className={`${chromeButtonClassName} mt-3 w-full`} type="button" disabled={isAppending} onClick={loadMore}>{isAppending ? "더 불러오는 중..." : "더 보기"}</button> : null}
       {appendError ? (
         <div role="alert">
           <p>{appendError}</p>
-          <button type="button" onClick={loadMore}>더 보기 재시도</button>
+          <button className={chromeButtonClassName} type="button" onClick={loadMore}>더 보기 재시도</button>
         </div>
       ) : null}
       {deleteError ? (
         <div role="alert">
           <p>{deleteError}</p>
-          <button type="button" disabled={deleting} onClick={end}>다시 시도</button>
+          <button className={chromeButtonClassName} type="button" disabled={deleting} onClick={end}>다시 시도</button>
         </div>
       ) : null}
       <p className="sr-only" aria-live="polite">{status}</p>

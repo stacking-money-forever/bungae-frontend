@@ -290,7 +290,7 @@ export default function MeetupChatPage() {
           {menuOpen ? (
             <div className="border-t border-[var(--stroke-neutral)] bg-[var(--bg-layer-floating)] px-4 py-3 text-[length:var(--type-body)] leading-[22px] text-[var(--fg-muted)]">
               <p className="m-0">실시간 수신은 아직 제공되지 않아요. 새 메시지는 아래에서 직접 새로고침해 주세요.</p>
-              <p className="m-0 mt-1">메시지 신고 기능은 이 계약에서 제공되지 않아요.</p>
+              <p className="m-0 mt-1">메시지 신고 기능은 아직 이용할 수 없어요.</p>
             </div>
           ) : null}
         </section>

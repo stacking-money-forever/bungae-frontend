@@ -13,12 +13,11 @@ export interface CreateFormValues {
   costAlcohol: string;
   preparation: string;
   facilitationTemplate: string;
-  deadline: string;
 }
 
 export type CreateFormErrors = Partial<
   Record<
-    "title" | "start" | "end" | "place" | "minimum" | "capacity" | "costAlcohol" | "facilitationTemplate" | "deadline",
+    "title" | "start" | "end" | "place" | "minimum" | "capacity" | "costAlcohol" | "facilitationTemplate",
     string
   >
 >;
@@ -69,13 +68,11 @@ export const initialValues: CreateFormValues = {
   costAlcohol: "무료 · 음주 없음",
   preparation: "",
   facilitationTemplate: "자유 진행",
-  deadline: "offset-90",
 };
 
 export function createInitialValues(options: TimeWheelOption[]): CreateFormValues {
   return {
     ...initialValues,
-    deadline: options[3]?.value ?? initialValues.deadline,
     start: options[5]?.value ?? initialValues.start,
     end: options[8]?.value ?? initialValues.end,
   };
@@ -85,7 +82,6 @@ export function validateMeetupForm(values: CreateFormValues): CreateFormErrors {
   const errors: CreateFormErrors = {};
   const start = getOffsetMinutes(values.start);
   const end = getOffsetMinutes(values.end);
-  const deadline = getOffsetMinutes(values.deadline);
   const minimum = Number(values.minimum);
   const capacity = Number(values.capacity);
 
@@ -95,9 +91,6 @@ export function validateMeetupForm(values: CreateFormValues): CreateFormErrors {
   }
   if (end === null || (start !== null && end <= start)) {
     errors.end = "종료 시간은 시작 시간보다 늦어야 해요.";
-  }
-  if (deadline === null || (start !== null && deadline > start)) {
-    errors.deadline = "확정 마감은 시작 시간보다 늦을 수 없어요.";
   }
   if (!values.place || values.place.isPublic !== true) {
     errors.place = "누구나 접근할 수 있는 공개 장소를 선택해 주세요.";

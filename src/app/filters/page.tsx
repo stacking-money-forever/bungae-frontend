@@ -181,7 +181,7 @@ function FiltersPageContent() {
           firstFilterRef.current?.focus();
         }}
         onCloseAutoFocus={(event) => event.preventDefault()}
-        className="flex min-h-[594px] !max-h-[calc(100svh-120px)] flex-col"
+        className="flex h-[min(594px,calc(100dvh-16px))] max-h-[calc(100dvh-16px)] !overflow-hidden flex-col"
       >
             <div className="mt-5 flex min-h-[52px] items-center justify-between">
               <AnimatedDialogTitle asChild>
@@ -201,7 +201,7 @@ function FiltersPageContent() {
               </button>
             </div>
 
-            <div className="mt-2">
+            <div className="mt-2 min-h-0 flex-1 overflow-y-auto">
               <FilterSelectRow
                 id="filter-activity"
                 label="활동"

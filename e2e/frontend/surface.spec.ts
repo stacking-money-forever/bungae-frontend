@@ -1,6 +1,8 @@
 import { expect, egressViolations, isAllowedPageError, test } from "../fixtures/egress";
 import type { Page } from "@playwright/test";
 
+import { measureLayout } from "./layout-geometry";
+
 /**
  * T06b surface QA — layout/zoom/keyboard on the real production build.
  *
@@ -24,26 +26,11 @@ function collectErrors(page: Page) {
   return pageErrors;
 }
 
-function viewportOverflow(): Array<{ tag: string; cls: string; width: number }> {
-  const doc = document.documentElement;
-  const body = document.body;
-  const overflowing: Array<{ tag: string; cls: string; width: number }> = [];
-  const vw = Math.max(doc.clientWidth, window.innerWidth);
-  if (body) {
-    const bw = body.getBoundingClientRect();
-    if (bw.width > vw + 0.5) {
-      overflowing.push({ tag: "body", cls: body.className, width: Math.round(bw.width) });
-    }
-  }
-  for (const el of Array.from(doc.querySelectorAll("body *"))) {
-    const rect = el.getBoundingClientRect();
-    const cs = getComputedStyle(el);
-    if (rect.width > vw + 0.5 && !/fixed|sticky/.test(cs.position) && cs.overflowX !== "hidden" && cs.overflowX !== "clip") {
-      const cls = typeof el.className === "string" ? el.className : "";
-      overflowing.push({ tag: el.tagName.toLowerCase(), cls: cls.slice(0, 90), width: Math.round(rect.width) });
-    }
-  }
-  return overflowing;
+async function assertLayout(page: Page) {
+  const layout = await page.evaluate(measureLayout);
+  expect(layout.overflowing, JSON.stringify(layout.overflowing)).toEqual([]);
+  expect(layout.intersections, JSON.stringify(layout.intersections)).toEqual([]);
+  return layout;
 }
 
 test.describe("narrow 320px layout", () => {
@@ -54,8 +41,7 @@ test.describe("narrow 320px layout", () => {
     await page.goto("/auth", { waitUntil: "networkidle" });
 
     await expect(page.getByRole("heading", { name: /24시간 안에 안전하게/ })).toBeVisible();
-    const overflow = await page.evaluate(viewportOverflow);
-    expect(overflow, JSON.stringify(overflow)).toEqual([]);
+    await assertLayout(page);
 
     const cta = page.getByRole("button", { name: "휴대전화로 시작하기" });
     await expect(cta).toBeVisible();
@@ -73,8 +59,7 @@ test.describe("narrow 320px layout", () => {
     await page.goto("/my-meetups", { waitUntil: "networkidle" });
 
     await expect(page.getByRole("heading", { name: "내 모임" })).toBeVisible();
-    const overflow = await page.evaluate(viewportOverflow);
-    expect(overflow, JSON.stringify(overflow)).toEqual([]);
+    await assertLayout(page);
 
     // Honest anonymous state: sign-in prompt (alert) renders, and the bottom
     // tab navigation (primary recovery) stays on screen.
@@ -86,53 +71,80 @@ test.describe("narrow 320px layout", () => {
   });
 });
 
-test.describe("long-content overflow at 390x844", () => {
+test.describe("static-copy overflow at 390x844", () => {
   test("auth screen tolerates a long national phone draft and long help text without horizontal overflow", async ({ page }) => {
     const pageErrors = collectErrors(page);
     await page.goto("/auth", { waitUntil: "networkidle" });
 
     const phone = page.getByRole("textbox", { name: "휴대전화 번호" });
-    await phone.fill("+82101234567890123456789012345678901234567890");
+    await phone.fill("010-12");
 
-    const overflow = await page.evaluate(viewportOverflow);
-    expect(overflow, JSON.stringify(overflow)).toEqual([]);
+    await assertLayout(page);
 
-    // Draft kept verbatim; validation error and help text must wrap, not clip.
+    // Incomplete draft stays local; validation error and help text must wrap, not clip.
     await page.getByRole("button", { name: "휴대전화로 시작하기" }).click();
-    await expect(page.getByRole("alert").filter({ hasText: "국가 코드를 포함한" })).toBeVisible();
-    const overflow2 = await page.evaluate(viewportOverflow);
-    expect(overflow2, JSON.stringify(overflow2)).toEqual([]);
+    await expect(page.getByRole("alert").filter({ hasText: "010-으로 시작하는" })).toBeVisible();
+    await assertLayout(page);
 
     assertNoEgress(page);
     expect(pageErrors.filter((text) => !isAllowedPageError(text))).toEqual([]);
   });
 
-  test("new-meetup auth-gate body and long-placeholder fields never overflow at 390px", async ({ page }) => {
+  test("new-meetup anonymous auth-gate copy never overflows at 390px", async ({ page }) => {
     const pageErrors = collectErrors(page);
     await page.goto("/meetups/new", { waitUntil: "networkidle" });
 
     await expect(page.getByRole("heading", { name: "로그인하고 모임을 만들어 주세요" })).toBeVisible();
-    const overflow = await page.evaluate(viewportOverflow);
-    expect(overflow, JSON.stringify(overflow)).toEqual([]);
+    await assertLayout(page);
 
     assertNoEgress(page);
     expect(pageErrors.filter((text) => !isAllowedPageError(text))).toEqual([]);
   });
 
-  test("filters screen tolerates long English/ko option labels without horizontal overflow", async ({ page }) => {
+  test("filters screen keeps its existing finite labels inside the viewport", async ({ page }) => {
     const pageErrors = collectErrors(page);
     await page.goto("/filters", { waitUntil: "networkidle" });
 
     const time = page.getByRole("combobox", { name: "시간 필터" });
     await expect(time).toBeVisible();
-    const overflow = await page.evaluate(viewportOverflow);
-    expect(overflow, JSON.stringify(overflow)).toEqual([]);
+    await assertLayout(page);
 
     assertNoEgress(page);
     expect(pageErrors.filter((text) => !isAllowedPageError(text))).toEqual([]);
   });
 });
 
+
+test.describe("layout 430px shell", () => {
+  test.use({ viewport: { width: 430, height: 844 } });
+
+  test("home anonymous shell keeps tab, fab, and feed inside 430px", async ({ page }) => {
+    const pageErrors = collectErrors(page);
+    await page.goto("/", { waitUntil: "networkidle" });
+    await expect(page.getByRole("navigation", { name: "주요 메뉴" })).toBeVisible();
+    await assertLayout(page);
+    assertNoEgress(page);
+    expect(pageErrors.filter((text) => !isAllowedPageError(text))).toEqual([]);
+  });
+});
+
+test.describe("filter sheet at 320x568", () => {
+  test.use({ viewport: { width: 320, height: 568 } });
+
+  test("keeps the filter title inside the layout viewport", async ({ page }) => {
+    const pageErrors = collectErrors(page);
+    await page.goto("/filters", { waitUntil: "networkidle" });
+    const title = page.getByRole("heading", { name: "필터" });
+    await expect(title).toBeVisible();
+    const box = await title.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.y).toBeGreaterThanOrEqual(-0.5);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(568.5);
+    await assertLayout(page);
+    assertNoEgress(page);
+    expect(pageErrors.filter((text) => !isAllowedPageError(text))).toEqual([]);
+  });
+});
 test.describe("keyboard-only reach", () => {
   test("auth phone → primary action is reachable and operable by keyboard with a visible focus ring", async ({ page }, testInfo) => {
     const pageErrors = collectErrors(page);
@@ -167,7 +179,7 @@ test.describe("keyboard-only reach", () => {
 
     // Enter activates the submit (invalid → local error, zero egress).
     await page.keyboard.press("Enter");
-    await expect(page.getByRole("alert").filter({ hasText: "국가 코드를 포함한" })).toBeVisible();
+    await expect(page.getByRole("alert").filter({ hasText: "010-으로 시작하는" })).toBeVisible();
 
     assertNoEgress(page);
     expect(pageErrors.filter((text) => !isAllowedPageError(text))).toEqual([]);

@@ -9,6 +9,7 @@ const tabPaths: Record<string, BottomNavigationTab> = {
   "/": "explore",
   "/filters": "explore",
   "/locations": "explore",
+  "/meetups/new": "explore",
   "/my-meetups": "my-meetups",
   "/notifications": "notifications",
 };
@@ -26,7 +27,7 @@ export function PersistentBottomNavigation() {
       {activeTab ? (
         <motion.div
           key="persistent-bottom-navigation"
-          className="fixed inset-x-0 bottom-0 z-10 mx-auto h-[76px] w-full max-w-[var(--screen-product-width)]"
+          className="persistent-bottom-navigation fixed inset-x-0 bottom-0 z-10 mx-auto h-[var(--tab-bar-occupied-height)] w-full max-w-[var(--screen-product-width)] bg-[var(--bg-layer-floating)]"
           aria-hidden={isFilterSheetRoute ? true : undefined}
           inert={isFilterSheetRoute}
           initial={reduceMotion ? false : { y: "100%" }}

@@ -42,7 +42,7 @@ export function MeetupListRow({
           alt={imageAlt}
           width={512}
           height={384}
-          sizes="(max-width: 390px) calc((100vw - 44px) / 2), 173px"
+          sizes="(max-width: 430px) calc((100vw - 44px) / 2), 193px"
           loading="lazy"
           decoding="async"
         />
