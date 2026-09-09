@@ -8,6 +8,12 @@ on:
 permissions:
   contents: read
 
+# The product's calendar and time-wheel copy is specified in Korea Standard
+# Time. Pin CI to the same timezone so date-boundary assertions are stable on
+# GitHub-hosted runners (which default to UTC).
+env:
+  TZ: Asia/Seoul
+
 jobs:
   verify:
     runs-on: ubuntu-latest
