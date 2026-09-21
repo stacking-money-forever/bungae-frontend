@@ -106,6 +106,9 @@
   - Aggregate evidence task(`privacyArtifactScan` → `gcfSemanticCheck`/report tasks)는 아직 configuration-cache 비호환이고, frozen validator가 Git·unreachable object·primary checkout·Trash 어디에도 없는 ignored `.gjc` 입력 두 개를 요구해 clean worktree에서 실패한다. 원본 spec SHA-256 `c7650ad1…94059a`와 plan SHA-256 `57439cd8…05f5a`에 정확히 일치하는 authoritative bytes를 복구하기 전에는 portable tracked bundle을 만들 수 없다. Hash-only 재창작은 금지한다.
 - [ ] Preview가 production DB·Push·사용자 데이터에 연결되지 않음을 증명한다.
 - [ ] 정식 domain/HTTPS/callback/환경변수/비밀키 구성을 검증한다.
+  - 2026-09-21 실측: 저장소의 `Deploy production` 워크플로(`.github/workflows/deploy.yml`)가 `workflow_run`으로 CI 성공 뒤 실행되지만, `npx vercel pull`에서 `Error: Could not retrieve Project Settings.`로 실패한다. 커밋 `de21c76`(2026-09-09)과 merge된 `747fa5b`(2026-09-21) 모두 같은 지점에서 실패했고 CI 자체는 성공한다.
+  - Vercel 프로젝트는 `bungae-review-main-20260906`(`prj_0ONMJrtYFsWnU3zCe0ixUPCWBs6P`, team `team_qikOEJyCAyZzZTFgeOD57Oeis`)로 존재하고, `vercel link`로 확인한 이 조합에서는 로컬 `vercel pull`이 성공한다. 즉 저장소 비밀값 `VERCEL_PROJECT_ID`/`VERCEL_ORG_ID`(2026-09-07 설정)가 현재 프로젝트와 맞지 않는다.
+  - 같은 프로젝트의 production 환경변수는 비어 있다(`VERCEL_*`·`TURBO_*` 시스템 값만 존재). 따라서 배포가 성공하더라도 `BUNGAE_API_ORIGIN`이 없어 same-origin `/v1/*`가 백엔드로 전달되지 않는다. production 배포와 그 환경설정은 사용자 Vercel/GitHub 계정 작업이며 저장소 코드만으로 닫을 수 없다.
 - [ ] 대표 기기·네트워크의 초기 표시, 입력 반응, 레이아웃 안정성, 반복 탭 전환 예산을 정하고 측정한다.
 
 ## G6. 운영·관측·롤백
