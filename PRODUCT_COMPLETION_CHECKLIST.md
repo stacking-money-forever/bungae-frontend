@@ -101,7 +101,7 @@
 ## G5. CI·배포·성능
 
 - [ ] 최종 revision에 test/typecheck/lint/build와 핵심 E2E를 CI로 연결한다.
-  - 2026-09-21 프론트 워크플로(`.github/workflows/ci.yml`)가 최종 revision에서 `typecheck` → `lint` → `test` → `build`(`BUNGAE_API_ORIGIN` 지정) → `test:api-proxy` → Playwright e2e를 실행하도록 연결했다. 원격 러너 성공은 push 후 확인한다.
+  - 2026-09-21 프론트 워크플로(`.github/workflows/ci.yml`)가 `typecheck` → `lint` → `test` → `build`(`BUNGAE_API_ORIGIN` 지정) → `test:api-proxy` → Playwright e2e를 실행하도록 연결했고, 원격 CI run `35580303996`의 `verify` 잡이 커밋 `ee6981c`에서 6분 12초에 통과했다.
   - Backend custom verification Test task는 JDK 21에서 configuration cache 저장·재사용 및 `concurrencyTest contractTest securityTest integrationTest migrationTest` 통과를 확인했다. CI workflow 연결은 아직 남았다.
   - Aggregate evidence task(`privacyArtifactScan` → `gcfSemanticCheck`/report tasks)는 아직 configuration-cache 비호환이고, frozen validator가 Git·unreachable object·primary checkout·Trash 어디에도 없는 ignored `.gjc` 입력 두 개를 요구해 clean worktree에서 실패한다. 원본 spec SHA-256 `c7650ad1…94059a`와 plan SHA-256 `57439cd8…05f5a`에 정확히 일치하는 authoritative bytes를 복구하기 전에는 portable tracked bundle을 만들 수 없다. Hash-only 재창작은 금지한다.
 - [ ] Preview가 production DB·Push·사용자 데이터에 연결되지 않음을 증명한다.

@@ -109,6 +109,7 @@ HTTPS로 살아 있었다.
 - `BUNGAE_API_ORIGIN=… npm run build`: 통과
 - `npm run test:api-proxy`: 통과 (POST method, `/api/v1` rewrite, query, JSON body, upstream status/header/body)
 - Playwright: **77/77 passed** (Chromium·WebKit·Firefox + PWA Chromium, 익명/no-API 셸 범위)
+- 원격 CI: run `35580303996` `verify` **success** (커밋 `ee6981c`, 6분 12초). 프론트 워크플로가 typecheck → lint → test → build → `test:api-proxy` → Playwright e2e를 원격 러너에서 실행한다.
 - `git diff --check`: 통과. package-lock은 기준 revision과 동일.
 
 ## 미검증·외부 권한 또는 환경 차단
