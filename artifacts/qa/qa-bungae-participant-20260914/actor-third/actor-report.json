@@ -1,0 +1,40 @@
+{
+  "task": "bungae-participant-blind-qa-third-20260914",
+  "worker": "qa-bungae-actor-third-20260914",
+  "launcher_receipt": "/private/var/folders/zx/s5045rsj1c95h7s0qw937gpm0000gn/T/omp-role-bungae-participant-blind-qa-third-20260914-r87s9fl6/.omp-role/bungae-participant-blind-qa-third-20260914-61f47329/launcher-receipt.json",
+  "source_revision": "de21c76e1f7afd99b15fd75e3f5e6ac15f21dfe9",
+  "target_url": "https://bungae-review-main-20260906-id8vi32s3-justn-hyeoks-projects.vercel.app",
+  "selector": "openai-codex/gpt-5.6-luna:medium",
+  "automatic_fallback": null,
+  "limits": {"action_budget": 18, "checkpoint_every": 1, "runtime_budget_seconds": 900, "silence_timeout_seconds": 180, "max_restarts": 1, "restart_index": 0},
+  "verdict": {"scope": "partial", "core_flow_status": "tested-pass", "core_flow_evidence_id": "8ecc40af936941708c088b2a4fb73aed", "coverage_verdict_id": "af01b8064bee4de3a0a2cfce8e5a13c7", "validator_valid": true, "validator_events": 49},
+  "tested_scope": [
+    "signed-out home and login gate",
+    "synthetic QA authentication",
+    "authenticated meetup discovery",
+    "meetup detail suitability",
+    "join confirmation and visible participant count update",
+    "reload recovery boundary",
+    "reachable re-login recovery controls"
+  ],
+  "skipped_scope": [
+    "post-reload OTP completion and re-authenticated participation redisplay",
+    "keyboard-only interaction",
+    "narrow viewport",
+    "filters",
+    "invalid input",
+    "cancellation",
+    "visual screenshot evidence because capture timed out"
+  ],
+  "observations": [
+    "Joining visibly completed, status was OPEN, count changed from 1/4 to 2/4, and cancel action appeared.",
+    "Reload visibly required login and did not show participation detail.",
+    "The second OTP request visibly entered an in-progress state before budget exhaustion."
+  ],
+  "interpretations": [
+    "The core join transaction appears accepted by the visible UI.",
+    "Authenticated-session persistence and post-re-auth participation redisplay remain unverified."
+  ],
+  "defect_claims": [],
+  "remaining_risk": "Reload recovery and participation redisplay after re-authentication were not completed within the action budget."
+}

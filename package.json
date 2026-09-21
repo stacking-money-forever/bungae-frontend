@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:api-proxy": "node scripts/api-proxy-smoke.mjs",
     "test:e2e": "playwright test",
     "test:e2e:pwa": "playwright test --project=pwa-chromium",
     "test:e2e:harness": "playwright test --config=playwright.harness.config.ts"

@@ -262,7 +262,7 @@ describe("ProfilePage", () => {
     fireEvent.click(screen.getByRole("button", { name: "인증 시작" }));
 
     expect(await screen.findByRole("button", { name: "인증 제공자에서 계속하기" })).toBeInTheDocument();
-    expect(api.createVerificationSession).toHaveBeenCalledWith("access-token");
+    expect(api.createVerificationSession).toHaveBeenCalledWith(`${window.location.origin}/profile`, "access-token");
     expect(window.location.href).toBe(originalHref);
   });
 

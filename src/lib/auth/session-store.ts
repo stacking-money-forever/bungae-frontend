@@ -137,9 +137,9 @@ export class AuthSessionStore {
     );
   }
 
-  createVerificationSession(): Promise<VerificationSession> {
+  createVerificationSession(returnUrl: string): Promise<VerificationSession> {
     return this.withAuthenticatedRequest((accessToken) =>
-      this.api.createVerificationSession(accessToken),
+      this.api.createVerificationSession(returnUrl, accessToken),
     );
   }
 

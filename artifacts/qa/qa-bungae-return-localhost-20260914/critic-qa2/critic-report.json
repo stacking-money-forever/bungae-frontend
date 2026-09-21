@@ -1,0 +1,24 @@
+{
+  "status": "cancelled",
+  "reason": "User changed exact QA model to workbuddy/deepseek-v4.1-flash; current launcher is openai-codex/gpt-5.6-luna:medium.",
+  "launcher_selector": "openai-codex/gpt-5.6-luna:medium",
+  "requested_selector": "workbuddy/deepseek-v4.1-flash",
+  "origin": "http://localhost:3117",
+  "route_checkpoints": [
+    {"route": "http://localhost:3117/", "result_id": "68b5ac9aa61d4372bdb51ff42ca052bd", "observed": "Signed-out home and visible login control loaded."},
+    {"route": "http://localhost:3117/auth", "result_id": "65c57b20e5824315b009a35fe7dbab1c", "observed": "Visible auth screen opened."}
+  ],
+  "scope": {"organizer_return_mechanism": "untested", "participant_path": "separately verified by Actor"},
+  "scores": {
+    "task_completion": "N/A", "findability": "N/A", "feedback_visibility": "N/A", "interaction_clarity": "N/A",
+    "error_recovery": "N/A", "consistency": "N/A", "accessibility_basics": "N/A", "perceived_friction": "N/A"
+  },
+  "evidence": {
+    "first_judgment": "first-judgment.md",
+    "journal": "worker-qa-bungae-c5-20260914.jsonl",
+    "validator": {"valid": true, "events": 8, "errors": []},
+    "oracle_audit": "f0a22721cbaf47ee89ae109955f7c0ca"
+  },
+  "defect_claim": false,
+  "screenshot_claim": false
+}

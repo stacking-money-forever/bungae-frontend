@@ -1,0 +1,66 @@
+{
+  "verdict": "fail_blocked",
+  "core_flow_status": "tested-fail",
+  "target_url": "http://localhost:3117",
+  "origin_policy": "all observed checkpoints remained http://localhost:3117",
+  "model": "openai-codex/gpt-5.6-luna:medium",
+  "fallback": null,
+  "revision": "de21c76e1f7afd99b15fd75e3f5e6ac15f21dfe9",
+  "task_space": 8,
+  "viewport": "390x844 visual evidence not captured; visual results untested",
+  "evidence_ids": [
+    "e32ff3adde39418ab3a0477677eefeba",
+    "484577b3924b471586c3e4dcfe713",
+    "ad57960449bc4059899d34b937ca42ea",
+    "4a496b2c5c104507b1dd8c2a234cd35b",
+    "1c096bd272da404994b4e9cef605f9bd",
+    "f45bc42e201e4138aca56e788ed8fa9e",
+    "70aef20636ec4990aa844af2021e0ee6",
+    "927023b6f4ab4933ad41517f31b52eec"
+  ],
+  "scores": {
+    "task_completion": 2,
+    "findability": 4,
+    "feedback_visibility": 3,
+    "interaction_clarity": 3,
+    "error_recovery": 2,
+    "consistency": 4,
+    "accessibility_basics": 3,
+    "perceived_friction": 2
+  },
+  "findings": [
+    {
+      "title": "Reload preserves route and exposes visible login recovery",
+      "observed": "The same meetup detail route reloaded into a login gate with 휴대전화로 로그인하기.",
+      "interpretation": "Visible recovery entry point is present.",
+      "friction": "A second authentication is required after reload.",
+      "status": "observed"
+    },
+    {
+      "title": "Reauthentication blocked by rate limit",
+      "observed": "The visible code request returned 요청이 많아요. 잠시 후 다시 인증번호를 요청해 주세요 twice, including after 65 seconds.",
+      "interpretation": "The final post-auth meetup/action restoration could not be tested in this fresh run.",
+      "friction": "No successful visible recovery path was available during the run.",
+      "status": "blocked_not_promoted_to_defect"
+    }
+  ],
+  "tested_scope": [
+    "visible authentication",
+    "내 모임 navigation",
+    "current meetup detail",
+    "OPEN and 모임 참여 취소하기 visibility",
+    "requested detail reload",
+    "preserved next destination",
+    "rate-limit recovery attempt"
+  ],
+  "skipped_scope": [
+    "successful post-reload OTP",
+    "same meetup/action after reauth",
+    "backend transaction truth",
+    "human comprehension",
+    "screenshot geometry/design",
+    "complete post-reload keyboard pass"
+  ],
+  "validator_result": "valid: true; events: 45; artifacts: []; errors: []; coverage_verdict_id=aa4704b2b10a442c969ffe761b997b9f",
+  "launcher_receipt": "/private/var/folders/zx/s5045rsj1c95h7s0qw937gpm0000gn/T/omp-role-bungae-return-critic-v4-6x4t2p17/.omp-role/bungae-return-critic-v4-c5b63283/launcher-receipt.json"
+}

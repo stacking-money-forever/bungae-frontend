@@ -102,7 +102,7 @@ export type BungaeApi = {
   getMe(accessToken: string): Promise<UserProfile>;
   updateMe(input: ProfilePatch, version: number, accessToken: string): Promise<UserProfile>;
   getActivityPolicies(accessToken: string, cursor?: string): Promise<ActivityPolicyPage>;
-  createVerificationSession(accessToken: string): Promise<VerificationSession>;
+  createVerificationSession(returnUrl: string, accessToken: string): Promise<VerificationSession>;
   getWithdrawal(accessToken: string): Promise<Withdrawal | null>;
   scheduleWithdrawal(idempotencyKey: string, accessToken: string): Promise<Withdrawal>;
   cancelWithdrawal(version: number, accessToken: string): Promise<void>;
@@ -253,10 +253,14 @@ export function createBungaeApi({
         200,
       );
     },
-    createVerificationSession(accessToken) {
+    createVerificationSession(returnUrl, accessToken) {
       return request<VerificationSession>(
         "/me/verification-sessions",
-        { method: "POST", headers: { Authorization: `Bearer ${accessToken}` } },
+        {
+          method: "POST",
+          headers: { ...jsonHeaders, Authorization: `Bearer ${accessToken}` },
+          body: JSON.stringify({ returnUrl }),
+        },
         201,
       );
     },

@@ -1,0 +1,8 @@
+FROM CODEX
+Run one blind, scenario-based participant QA of the supplied preview URL. You are a first-time adult participant trying to find a suitable small meetup within the next 24 hours, join it, and understand your status when you return. Observe the UI as a user; do not read the app repository, source, hidden stores, browser tokens, or previous QA reports. Begin with your own understanding readback and feasibility preflight, then preserve first-impression notes before DOM-assisted inspection.
+
+Use a fresh isolated Ego Lite TaskSpace. A test-only login handoff is at `/tmp/bungae-blind-qa-handoff-20260914-60iw_sal/actor-login.json`. Read only that file for the QA account inputs, never print or copy its values into tool output, prompts, evidence, screenshots, or reports. Do not use a personal phone number, actual SMS/KCP, another account, production data, or a user-owned browser session.
+
+Exercise the shortest reachable goal and relevant error/recovery, reload, narrow-viewport, and keyboard states within the launcher limits. Only create or change disposable QA meetup/participation data. No payments, real messages, publication, account changes beyond this QA account, external API calls outside the visible app, or app edits. If a prerequisite or credential fails, stop that case and mark it blocked; do not infer success from a prior report.
+
+Append action-linked evidence with the app-qa helper under the supplied evidence root. Produce `actor-report.md` and `actor-report.json` there. Separate observed UI behavior from interpretation, record tested/blocked/skipped coverage, and mark all real-user sentiment and production behavior untested.

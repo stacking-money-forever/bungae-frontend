@@ -1,0 +1,29 @@
+{
+  "run_id": "f9e8ce86573544bd871d19b0bff9f8e6",
+  "launcher_receipt": "/private/var/folders/zx/s5045rsj1c95h7s0qw937gpm0000gn/T/omp-role-bungae-return-local-qa-20260914-_qfrvv9_/.omp-role/bungae-return-local-qa-20260914-19132711/launcher-receipt.json",
+  "source_revision": "de21c76e1f7afd99b15fd75e3f5e6ac15f21dfe9",
+  "target_url": "http://127.0.0.1:3117",
+  "worker": "qa-bungae-return-local-20260914",
+  "space": {"name": "bungae return QA", "id": 4, "isolation": "fresh Ego Lite TaskSpace"},
+  "limits": {"action_budget": 24, "checkpoint_every": 1, "runtime_budget_seconds": 900, "silence_timeout_seconds": 180, "max_restarts": 1, "restart_index": 0},
+  "validation": {"valid": true, "event_count": 37, "method": "qa_event.py finish / evidence.py validate"},
+  "verdict": {"completion_scope": "partial", "core_flow_status": "blocked", "core_flow_evidence_id": "bb9e008fb4c84262959193ea4ea0619b"},
+  "observed": [
+    "Home visibly required login before nearby meetups could be viewed.",
+    "Login phone form and 18+ notice were visible.",
+    "Visible submit and keyboard Enter both left the phone step in place and showed no code-entry screen.",
+    "Reload preserved the auth form without visible participation state.",
+    "390x844 semantic auth surface remained reachable.",
+    "Unauthenticated 내 모임 showed a login-required alert.",
+    "Initial screenshot capture hit an Ego Lite CDP Page.captureScreenshot timeout; no screenshot claim was made."
+  ],
+  "interpretation": [
+    "Return/re-authentication/participation-state flow blocked at phone submission.",
+    "No backend or business defect claimed: no independent oracle and no fresh-state reproduction."
+  ],
+  "tested_scope": ["home", "login entry", "synthetic QA phone entry", "phone submit", "keyboard Enter", "auth reload", "390x844 reachability", "unauthenticated 내 모임"],
+  "skipped_scope": ["code entry", "authenticated return state", "meetup discovery", "participation record inspection", "post-auth reload", "visual screenshot review"],
+  "skip_reasons": ["phone submit exposed no next authentication step", "screenshot capture timed out"],
+  "untested_claims": ["server-side participation truth", "business correctness", "full responsive visual layout"],
+  "sensitive_data_policy": "Credential values omitted from report and evidence text."
+}

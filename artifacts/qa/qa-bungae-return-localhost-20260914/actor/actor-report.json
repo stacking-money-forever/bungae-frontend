@@ -1,0 +1,49 @@
+{
+  "worker": "qa-bungae-return-host-20260914",
+  "role": "qa_actor",
+  "selector": "openai-codex/gpt-5.6-luna:medium",
+  "launcher_receipt": "/private/var/folders/zx/s5045rsj1c95h7s0qw937gpm0000gn/T/omp-role-bungae-return-localhost-qa-20260914-_kwsoytq/.omp-role/bungae-return-localhost-qa-20260914-1ebab85f/launcher-receipt.json",
+  "target_url": "http://localhost:3117",
+  "evidence_root": "/Users/justn/dev/.worktrees/bungae-frontend-participant-flow/artifacts/qa/qa-bungae-return-localhost-20260914/actor",
+  "taskspace": {"space_id": 5, "page": "p1", "fresh_isolated": true},
+  "tested_scope": [
+    "fresh login discovery",
+    "visible phone and verification authentication",
+    "current meetup participation state",
+    "reload and visible re-authentication recovery",
+    "keyboard activation of key controls",
+    "390x844 semantic reachability"
+  ],
+  "skipped_scope": [
+    "payments",
+    "messaging",
+    "publication",
+    "destructive actions",
+    "personal or production data",
+    "source, bundles, hidden state, tokens, undocumented APIs",
+    "screenshot visual scoring"
+  ],
+  "observations": [
+    "Authenticated home exposed one current OPEN meetup.",
+    "Meetup detail exposed the participant state through a visible cancel-participation action.",
+    "Reload showed login-needed state at the same meetup URL.",
+    "Visible re-authentication restored the same meetup details and participation action.",
+    "Pointer activation was intercepted in two attempts; keyboard Enter succeeded.",
+    "Ego screenshot capture timed out, so no visual claim was made."
+  ],
+  "interpretation": {
+    "core_flow": "tested-pass",
+    "core_flow_evidence_id": "1f5f56a0f5514ddb97207f23f2f5ad96",
+    "business_defect_claim": false,
+    "oracle": "Executable visible-state oracle: the same meetup participation state is visible before reload and after re-authentication."
+  },
+  "validation": {
+    "coverage_verdict_id": "f839ce0a330749008fc1448b5bde82f9",
+    "journal": "/Users/justn/dev/.worktrees/bungae-frontend-participant-flow/artifacts/qa/qa-bungae-return-localhost-20260914/actor/worker-qa-bungae-return-host-20260914.jsonl",
+    "valid": true,
+    "event_count": 55,
+    "errors": [],
+    "completed_actions": 17,
+    "remaining_action_budget": 7
+  }
+}

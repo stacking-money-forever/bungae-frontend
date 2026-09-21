@@ -15,6 +15,12 @@ import { useOnlineStatus } from "@/lib/ui/online";
 
 const koreanMobilePattern = /^010-\d{4}-\d{4}$/;
 const otpPattern = /^[0-9]{6}$/;
+const postAuthPathPattern = /^\/meetups\/[A-Za-z0-9_-]+$/;
+
+function postAuthDestination(): string {
+  const next = new URLSearchParams(window.location.search).get("next");
+  return next !== null && postAuthPathPattern.test(next) ? next : "/";
+}
 
 function formatKoreanMobile(value: string): string {
   let digits = value.replace(/\D/g, "");
@@ -216,8 +222,9 @@ export default function AuthPage() {
       if (!user || verificationAttemptRef.current !== attempt || challengeVersionRef.current !== challengeVersion) {
         return;
       }
-      setNavigationIntent("replace", "/");
-      router.replace("/");
+      const destination = postAuthDestination();
+      setNavigationIntent("replace", destination);
+      router.replace(destination);
     } catch (error) {
       if (verificationAttemptRef.current !== attempt || challengeVersionRef.current !== challengeVersion) {
         return;

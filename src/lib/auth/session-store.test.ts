@@ -325,7 +325,7 @@ describe("AuthSessionStore", () => {
     await store.createSession({ requestId: user.id, otp: "123456" });
 
     const oldPatch = store.updateMe({ displayName: "이전 계정" }, user.version);
-    const oldVerification = store.createVerificationSession();
+    const oldVerification = store.createVerificationSession("https://app.example/profile");
     await store.createSession({ requestId: anotherUser.id, otp: "654321" });
     pendingPatch.resolve({ ...user, displayName: "이전 계정" });
     pendingVerification.resolve({
@@ -336,6 +336,7 @@ describe("AuthSessionStore", () => {
 
     await expect(oldPatch).rejects.toBeInstanceOf(SessionExpiredError);
     await expect(oldVerification).rejects.toBeInstanceOf(SessionExpiredError);
+    expect(api.createVerificationSession).toHaveBeenCalledWith("https://app.example/profile", "old-access");
     expect(store.getSnapshot()).toEqual({ status: "authenticated", user: anotherUser });
   });
 

@@ -61,13 +61,15 @@ export default function MeetupDetailPage() {
     meetupId: string;
     status: "idle" | "loading" | "ready" | "error";
     meetup: Meetup | null;
+    relation: string | null;
     error: string | null;
-  }>({ subject: null, epoch: 0, meetupId: "", status: "idle", meetup: null, error: null });
+  }>({ subject: null, epoch: 0, meetupId: "", status: "idle", meetup: null, relation: null, error: null });
   const detailStateMatchesRouteAndSession =
     meetupState.subject === subject &&
     meetupState.epoch === sessionEpoch &&
     meetupState.meetupId === meetupId;
   const currentMeetup = detailStateMatchesRouteAndSession ? meetupState.meetup : null;
+  const currentRelation = detailStateMatchesRouteAndSession ? meetupState.relation : null;
   const authenticatedDetailLoading =
     subject !== null &&
     (!detailStateMatchesRouteAndSession ||
@@ -80,11 +82,36 @@ export default function MeetupDetailPage() {
   const loadMeetup = useCallback(async () => {
     if (!subject || !auth) return;
     const request = ++meetupRequest.current;
-    setMeetupState({ subject, epoch: sessionEpoch, meetupId, status: "loading", meetup: null, error: null });
+    setMeetupState({ subject, epoch: sessionEpoch, meetupId, status: "loading", meetup: null, relation: null, error: null });
     try {
       const meetup = await auth.getMeetup(meetupId);
+      let relation: string | null = null;
+      let cursor: string | undefined;
+      const seenCursors = new Set<string>();
+      try {
+        do {
+          const page = await auth.listMyMeetups({ relation: "ALL", cursor, limit: 100 });
+          relation = page.items.find((item) => item.id === meetupId)?.relation ?? null;
+          if (relation || !page.nextCursor || seenCursors.has(page.nextCursor)) break;
+          cursor = page.nextCursor;
+          seenCursors.add(cursor);
+        } while (true);
+      } catch (error) {
+        if (error instanceof SessionExpiredError) throw error;
+        if (meetupRequest.current !== request || subjectRef.current !== subject || epochRef.current !== sessionEpoch) return;
+        setMeetupState({
+          subject,
+          epoch: sessionEpoch,
+          meetupId,
+          status: "error",
+          meetup: null,
+          relation: null,
+          error: "참여 여부를 확인하지 못했어요. 다시 시도해 주세요.",
+        });
+        return;
+      }
       if (meetupRequest.current !== request || subjectRef.current !== subject || epochRef.current !== sessionEpoch) return;
-      setMeetupState({ subject, epoch: sessionEpoch, meetupId, status: "ready", meetup, error: null });
+      setMeetupState({ subject, epoch: sessionEpoch, meetupId, status: "ready", meetup, relation, error: null });
     } catch (error) {
       if (meetupRequest.current !== request || subjectRef.current !== subject || epochRef.current !== sessionEpoch || error instanceof SessionExpiredError) return;
       setMeetupState({
@@ -93,6 +120,7 @@ export default function MeetupDetailPage() {
         meetupId,
         status: "error",
         meetup: null,
+        relation: null,
         error: error instanceof ApiProblemError ? error.problem?.detail ?? "모임을 불러오지 못했어요." : "모임을 불러오지 못했어요.",
       });
     }
@@ -101,7 +129,7 @@ export default function MeetupDetailPage() {
   useEffect(() => {
     meetupRequest.current += 1;
     if (!subject) {
-      setMeetupState({ subject: null, epoch: 0, meetupId: "", status: "idle", meetup: null, error: null });
+      setMeetupState({ subject: null, epoch: 0, meetupId: "", status: "idle", meetup: null, relation: null, error: null });
       return;
     }
     void loadMeetup();
@@ -224,7 +252,7 @@ export default function MeetupDetailPage() {
 
 
   async function joinMeetup() {
-    if (!subject || !auth || !currentMeetup?.allowedActions.includes("JOIN") || !online) return;
+    if (!subject || !auth || !currentMeetup?.allowedActions.includes("JOIN") || currentRelation || activeJoinState.result || !online) return;
     const existing = joinAttemptRef.current?.identity === detailLocalIdentity
       ? joinAttemptRef.current
       : { identity: detailLocalIdentity, idempotencyKey: crypto.randomUUID(), inFlight: null };
@@ -238,6 +266,7 @@ export default function MeetupDetailPage() {
       if (subjectRef.current !== subject || meetupIdRef.current !== meetupId) return;
       joinAttemptRef.current = null;
       setJoinState({ identity: detailLocalIdentity, status: "done", result, error: null });
+      setLeaveState({ identity: detailLocalIdentity, status: "idle", error: null });
       await loadMeetup();
     } catch (error) {
       if (subjectRef.current !== subject || meetupIdRef.current !== meetupId) return;
@@ -249,7 +278,7 @@ export default function MeetupDetailPage() {
   }
 
   async function leaveMeetup() {
-    if (!subject || !auth || !currentMeetup?.allowedActions.includes("LEAVE") || !online) return;
+    if (!subject || !auth || !currentMeetup || !(currentMeetup.allowedActions.includes("LEAVE") || (currentMeetup.state === "OPEN" && currentRelation === "PARTICIPANT")) || !online) return;
     const existing = leaveAttemptRef.current?.identity === detailLocalIdentity
       ? leaveAttemptRef.current
       : { identity: detailLocalIdentity, inFlight: null };
@@ -263,6 +292,7 @@ export default function MeetupDetailPage() {
       if (subjectRef.current !== subject || meetupIdRef.current !== meetupId) return;
       leaveAttemptRef.current = null;
       setLeaveState({ identity: detailLocalIdentity, status: "done", error: null });
+      setJoinState({ identity: detailLocalIdentity, status: "idle", result: null, error: null });
       await loadMeetup();
     } catch (error) {
       if (subjectRef.current !== subject || meetupIdRef.current !== meetupId) return;
@@ -286,7 +316,7 @@ export default function MeetupDetailPage() {
           </p>
         </section>
         <BottomActionBar>
-          <Link className="inline-flex min-h-[var(--action-primary-height)] w-full items-center justify-center rounded-[12px] bg-[var(--brand-accent)] px-4 text-[length:var(--type-action)] font-bold leading-6 text-[var(--fg-on-brand)]" href="/auth">
+          <Link className="inline-flex min-h-[var(--action-primary-height)] w-full items-center justify-center rounded-[12px] bg-[var(--brand-accent)] px-4 text-[length:var(--type-action)] font-bold leading-6 text-[var(--fg-on-brand)]" href={`/auth?next=${encodeURIComponent(`/meetups/${encodedMeetupId}`)}`}>
             휴대전화로 로그인하기
           </Link>
         </BottomActionBar>
@@ -309,12 +339,12 @@ export default function MeetupDetailPage() {
   const meetupTitle = currentMeetup?.title ?? "";
   const meetupDescription = currentMeetup?.description ?? "";
   const meetupStatus = currentMeetup
-    ? currentMeetup.allowedActions.includes("JOIN")
+    ? currentMeetup.allowedActions.includes("JOIN") && !currentRelation && !activeJoinState.result
       ? "참여 가능한 모임이에요."
       : `현재 상태: ${currentMeetup.state}`
     : "";
-  const hasJoinAction = currentMeetup?.allowedActions.includes("JOIN") ?? false;
-  const hasLeaveAction = currentMeetup?.allowedActions.includes("LEAVE") ?? false;
+  const hasJoinAction = Boolean(currentMeetup?.allowedActions.includes("JOIN") && !currentRelation && !activeJoinState.result);
+  const hasLeaveAction = Boolean(currentMeetup?.allowedActions.includes("LEAVE") || (currentMeetup?.state === "OPEN" && currentRelation === "PARTICIPANT"));
   const hasCancelAction = currentMeetup?.allowedActions.includes("CANCEL") ?? false;
   const hasQuorumDecisionAction = currentMeetup?.allowedActions.includes("QUORUM_DECISION") ?? false;
   const hasCheckInAction = currentMeetup?.allowedActions.includes("CHECK_IN") ?? false;

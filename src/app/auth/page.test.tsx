@@ -131,6 +131,7 @@ describe("AuthPage", () => {
     routerReplace.mockReset();
     setNavigationIntent.mockReset();
     setOnline(true);
+    window.history.replaceState(null, "", "/auth");
   });
 
   afterEach(() => {
@@ -170,6 +171,55 @@ describe("AuthPage", () => {
         requestId: "a7c77e71-5b90-42f2-b9e1-8f6c8b1db76c",
         otp: "123456",
       });
+      expect(setNavigationIntent).toHaveBeenCalledWith("replace", "/");
+      expect(routerReplace).toHaveBeenCalledWith("/");
+    });
+  });
+
+  it.each([
+    "/meetups/b7c77e71-5b90-42f2-b9e1-8f6c8b1db76c",
+    "/meetups/abc_DEF-123",
+  ])("returns to the safe meetup path %s after a successful OTP", async (next) => {
+    window.history.replaceState(null, "", `/auth?next=${encodeURIComponent(next)}`);
+    const api = createApi();
+    renderAuth(api);
+
+    requestCode();
+    await screen.findByRole("heading", { name: "인증번호를 입력해 주세요" });
+    fireEvent.change(screen.getByRole("textbox", { name: "인증번호" }), {
+      target: { value: "123456" },
+    });
+    fireEvent.submit(screen.getByRole("textbox", { name: "인증번호" }).closest("form")!);
+
+    await waitFor(() => {
+      expect(api.createSession).toHaveBeenCalledTimes(1);
+      expect(setNavigationIntent).toHaveBeenCalledWith("replace", next);
+      expect(routerReplace).toHaveBeenCalledWith(next);
+    });
+  });
+
+  it.each([
+    "https://evil.example/meetups/x",
+    "//evil.example/meetups/x",
+    "/meetups/../auth",
+    "/meetups/abc/extra",
+    "/meetups/",
+    "/profile",
+    "javascript:alert(1)",
+  ])("falls back to / after a successful OTP when next is unsafe (%s)", async (next) => {
+    window.history.replaceState(null, "", `/auth?next=${encodeURIComponent(next)}`);
+    const api = createApi();
+    renderAuth(api);
+
+    requestCode();
+    await screen.findByRole("heading", { name: "인증번호를 입력해 주세요" });
+    fireEvent.change(screen.getByRole("textbox", { name: "인증번호" }), {
+      target: { value: "123456" },
+    });
+    fireEvent.submit(screen.getByRole("textbox", { name: "인증번호" }).closest("form")!);
+
+    await waitFor(() => {
+      expect(api.createSession).toHaveBeenCalledTimes(1);
       expect(setNavigationIntent).toHaveBeenCalledWith("replace", "/");
       expect(routerReplace).toHaveBeenCalledWith("/");
     });

@@ -300,7 +300,7 @@ export default function ProfilePage() {
     }
     setVerification({ subject: submittedSessionKey, value: { ...initialVerification, state: "requesting" } });
     try {
-      const session = await createVerificationSession();
+      const session = await createVerificationSession(`${window.location.origin}/profile`);
       if (sessionKeyRef.current !== submittedSessionKey) return;
       if (!isSafeProviderUrl(session.providerUrl)) {
         setVerification({ subject: submittedSessionKey, value: { ...initialVerification, state: "error", error: "안전한 HTTPS 인증 주소를 받지 못했어요. 다시 시도해 주세요." } });
