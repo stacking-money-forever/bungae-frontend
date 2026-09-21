@@ -16,8 +16,15 @@
 
 ```bash
 npm ci
-npm run dev
+BUNGAE_API_ORIGIN=http://127.0.0.1:8080 npm run dev
 ```
+
+`BUNGAE_API_ORIGIN`은 경로·query·credential이 없는 백엔드 HTTP(S) origin이다.
+브라우저의 same-origin `/v1/*` 요청은 서버에서 이 origin의 `/api/v1/*`로
+전달된다. 프론트와 백엔드를 분리 배포할 때 이 서버 전용 값을 설정하지 않으면
+API 요청은 프론트 호스트의 `/v1/*`에 남는다. Firebase Web Messaging은
+[`.env.example`](.env.example)의 필수 Firebase web 식별자와 VAPID 값을
+설정한 환경에서만 활성화된다.
 
 검증 명령:
 
@@ -26,6 +33,7 @@ npm test
 npm run typecheck
 npm run lint
 npm run build
+npm run test:api-proxy
 npm run test:e2e
 ```
 
@@ -33,7 +41,7 @@ npm run test:e2e
 
 ### 과거 no-API 스냅샷
 
-2026-09-07 no-API 실행 기록(`e126c1fb`, base `cdf1328`)은 당시 fixture/로컬 상태 경계의 증거다. 체크리스트: [`FRONTEND_NO_API_EXECUTION_CHECKLIST.md`](./FRONTEND_NO_API_EXECUTION_CHECKLIST.md). 단계 보고: `.omp-role/reports/frontend-no-api-t01-shell.md` … `frontend-no-api-t07-final.md`. 그 기록의 통과 수와 HEAD 런타임은 같지 않다. 현재 분기는 `review/product-finish-main-20260906`이며 인증 세션은 `/v1`을 호출한다.
+2026-09-07 no-API 실행 기록(`e126c1fb`, base `cdf1328`)은 당시 fixture/로컬 상태 경계의 증거다. 체크리스트: [`FRONTEND_NO_API_EXECUTION_CHECKLIST.md`](./FRONTEND_NO_API_EXECUTION_CHECKLIST.md). 단계 보고: `.omp-role/reports/frontend-no-api-t01-shell.md` … `frontend-no-api-t07-final.md`. 그 기록의 통과 수와 현재 런타임은 같지 않다. 현재 구현의 인증 세션과 참가자 화면은 `/v1` API를 호출한다.
 
 ## 기준 저장소
 

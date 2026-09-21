@@ -1,7 +1,7 @@
-# 벙개 프론트엔드 ↔ 백엔드 API 계약 제안
+# 벙개 프론트엔드 ↔ 백엔드 API 계약 참고
 
-> 상태: **PROPOSED · NOT IMPLEMENTED**
-> 이 문서는 현재 프론트엔드와 디자인 명세를 연결한 구현 제안이다. 아래 엔드포인트가 실제 서버에 존재한다는 뜻이 아니며, 백엔드 구현·배포·호환성을 보증하지 않는다. 미해결 결정은 마지막 절에서 합의한 뒤 `v1` 계약으로 고정한다.
+> 상태: **HISTORICAL PROPOSAL + IMPLEMENTATION REFERENCE**
+> 이 문서는 초기 제안 행을 보존하며 live backend 또는 배포 완료를 보증하지 않는다. 현재 프론트 구현의 정확한 request/response type과 status는 `src/lib/api/` 및 해당 테스트가 기준이고, 제품 완료 여부는 `PRODUCT_COMPLETION_CHECKLIST.md`에서 판정한다. 미해결 결정은 구현에서 추정하지 않는다.
 
 ## 1. 기준과 범위
 
@@ -23,7 +23,7 @@
 7. 알림 전송 실패는 모임 상태 변경을 롤백하지 않는다.
 8. 물리 삭제보다 상태 전이와 감사 가능한 논리 삭제를 우선한다.
 
-배포 호스트와 공통 prefix(`/api/v1` 등)는 미정이다. 이 문서의 `/meetups` 같은 경로는 **리소스 경로**이며, 합의 전 임의 prefix를 붙이지 않는다.
+브라우저 client의 base path는 same-origin `/v1`이다. 분리 배포에서는 `next.config.ts`가 이를 `BUNGAE_API_ORIGIN`의 `/api/v1`로 전달한다. 이 문서의 `/meetups` 같은 표기는 base path 뒤의 **리소스 경로**다.
 
 ## 2. 현재 프론트엔드 라우트 인벤토리
 
