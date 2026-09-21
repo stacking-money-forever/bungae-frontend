@@ -1,0 +1,52 @@
+{
+  "task": "bungae-participant-blind-qa-20260914",
+  "worker": "qa-bungae-actor-20260914",
+  "status": "failed_qa_attempt",
+  "completion_scope": "partial",
+  "qa_complete": false,
+  "target_url": "https://bungae-review-main-20260906-id8vi32s3-justn-hyeoks-projects.vercel.app",
+  "source_revision": "de21c76e1f7afd99b15fd75e3f5e6ac15f21dfe6",
+  "evidence_root": "/Users/justn/dev/.worktrees/bungae-frontend-participant-flow/artifacts/qa/qa-bungae-participant-20260914/actor",
+  "taskspace_id": 0,
+  "limits": {
+    "action_budget": 35,
+    "checkpoint_every": 7,
+    "runtime_budget_seconds": 1200,
+    "silence_timeout_seconds": 180,
+    "max_restarts": 1,
+    "restart_index": 0
+  },
+  "observed_ui": [
+    "Unauthenticated home showed a login gate.",
+    "Visible login text and link clicks were blocked by a paragraph child intercepting pointer input; Tab/Enter did not open auth.",
+    "Direct navigation to the visible /auth destination loaded phone and OTP forms; the disposable QA account authenticated successfully.",
+    "Authenticated home showed one free, public, near-term walking meetup.",
+    "Meetup detail showed OPEN and a primary action meaning cancel participation, indicating the account was already participating; no new join was performed.",
+    "Reload returned a visible login-required state instead of retaining authenticated participation status."
+  ],
+  "interpretation_advisory": [
+    "Login pointer/keyboard behavior is a candidate usability or functional issue, not a confirmed defect.",
+    "Reload session loss is an observed candidate only; no independent oracle or fresh-state reproduction exists.",
+    "All production behavior and real-user sentiment are untested."
+  ],
+  "coverage": {
+    "tested": ["readback", "feasibility preflight", "login flow", "meetup discovery", "meetup detail status", "reload observation", "keyboard login observation"],
+    "blocked_or_unvisited": ["new join transition because account was already joined", "invalid/empty input", "cancel/reset", "narrow viewport", "back/forward", "visual screenshot claims"],
+    "reason": "Stopped browser interactions at Codex direction after append-only evidence validation failure."
+  },
+  "validator": {
+    "valid": false,
+    "events": 29,
+    "errors": [
+      "order 17: result references no prior attempt",
+      "order 26: checkpoint required before the next action",
+      "order 28: checkpoint completed_actions mismatch",
+      "order 28: checkpoint remaining_action_budget mismatch",
+      "order 29: invalid core_flow_status"
+    ]
+  },
+  "evidence_journal_preserved": true,
+  "historical_events_rewritten_or_deleted": false,
+  "defect_claims": [],
+  "notes": "Append-only corrective results were recorded for attempted IDs 7c9cbba805cc4225acd04c1f0e934d0b and c6e5023c503a447e851d2ff00fc4c7bb. The invalid journal was preserved; no qa-complete claim is made."
+}

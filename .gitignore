@@ -39,3 +39,6 @@ test-results/
 playwright-report/
 blob-report/
 .vercel
+
+# Isolated QA credentials stay local to the worktree that runs the QA session
+artifacts/qa/QA_ACCOUNTS.local.md

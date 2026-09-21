@@ -1,0 +1,44 @@
+{
+  "verdict": "failure",
+  "primary_outcome": "Reloading an authenticated meetup detail showed login-required state; keyboard-submitted reauthentication returned home instead of the same meetup.",
+  "provider_model": "openai-codex/gpt-5.6-luna:medium",
+  "effort": "configurable",
+  "fallback": "none",
+  "source_revision": "de21c76e1f7afd99b15fd75e3f5e6ac15f21dfe9",
+  "target_url": "http://localhost:3117",
+  "runtime_receipt": "/private/var/folders/zx/s5045rsj1c95h7s0qw937gpm0000gn/T/omp-role-bungae-return-localhost-critic-20260914-7w__1cyp/.omp-role/bungae-return-localhost-critic-20260914-f65dff08/launcher-receipt.json",
+  "task_space": "critic-owned Ego Lite space 6",
+  "locale": "ko",
+  "viewport": "default functional flow; 390x844 screenshot attempted and timed out",
+  "oracle_audit_id": "c7a4f396f0b84725a679c8682ed20769",
+  "reproduction_event_id": "c33e877036434d6689dfc701c2c492c5",
+  "fresh_state_evidence": "fresh-state-reproduction.md",
+  "observed": [
+    "Authenticated meetup detail displayed OPEN state and participant-facing detail content.",
+    "Reload preserved the meetup URL but displayed 로그인하고 모임을 확인해 주세요 and 휴대전화로 로그인하기.",
+    "After synthetic reauthentication, pressing Enter on the focused submit button returned to app home rather than the original meetup URL."
+  ],
+  "interpretation": "The returning-participant flow does not preserve authenticated meetup context across reload and reauthentication.",
+  "friction": "The participant must rediscover the meetup after login.",
+  "evidence_ids": [
+    "a844fa786b9a4e3d91b2cc8f5aa09121",
+    "0254139fbc754052a70f9242735d01f5",
+    "28423e29824f4b2bacbaf17629ab2137"
+  ],
+  "coverage": {
+    "tested": ["entry navigation", "login", "authentication", "meetup discovery", "detail", "reload", "reauthentication", "keyboard activation"],
+    "untested": ["pointer activation of critical return control", "post-return participation activation", "backend transaction truth", "visual geometry/design intent", "screen-reader behavior", "real-person comprehension"],
+    "blocked": ["390x844 screenshot capture timed out"]
+  },
+  "scores": {
+    "task_completion": {"score": 1, "evidence": "Complete return path failed."},
+    "findability": {"score": 2, "evidence": "Meetup was findable in 내 모임; reauth returned home."},
+    "feedback_visibility": {"score": 2, "evidence": "Login-required message and control were visible."},
+    "interaction_clarity": {"score": 2, "evidence": "Named controls and keyboard submission worked; destination was not preserved."},
+    "error_recovery": {"score": 1, "evidence": "Reauthentication did not recover original meetup context."},
+    "consistency": {"score": 1, "evidence": "Detail became login-required after reload."},
+    "accessibility_basics": {"score": 2, "evidence": "Keyboard Enter submitted; pointer/focus-return checks untested."},
+    "perceived_friction": {"score": 1, "evidence": "Forced login and rediscovery are high friction."}
+  },
+  "unsupported_claims": ["backend/business truth", "visual screenshot/layout", "real-person comprehension"]
+}

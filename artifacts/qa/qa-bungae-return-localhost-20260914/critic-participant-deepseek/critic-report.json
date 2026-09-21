@@ -1,0 +1,178 @@
+{
+  "run": {
+    "role": "qa_critic",
+    "worker_id": "qa-bungae-dsp-20260914",
+    "provider_model": "workbuddy/deepseek-v4.1-flash:medium",
+    "effort": "medium",
+    "effort_availability": "configurable",
+    "fallback_decision": "none",
+    "automatic_fallback": null,
+    "fallback_transition": null,
+    "retry_model_fallback": false,
+    "retry_fallback_chains": {},
+    "callback_run_id": "37630b2737734e989e2bdf892e18e67b",
+    "launcher_receipt": "/private/var/folders/zx/s5045rsj1c95h7s0qw937gpm0000gn/T/omp-role-bungae-return-participant-ds-vls0v8m0/.omp-role/bungae-return-participant-ds-aa99e6bd/launcher-receipt.json",
+    "source_worktree": "/Users/justn/dev/.worktrees/bungae-frontend-participant-flow",
+    "source_revision": "de21c76e1f7afd99b15fd75e3f5e6ac15f21dfe9",
+    "target_url": "http://localhost:3117",
+    "locale": "ko-KR",
+    "viewport": ["default (195x422 CSS viewport observed in hit test)", "390x844 emulated"],
+    "egolite_space_id": 11,
+    "egolite_page_label": "p1",
+    "runtime_limits": {
+      "action_budget": 20,
+      "checkpoint_every": 1,
+      "max_restarts": 1,
+      "restart_index": 0,
+      "runtime_budget_seconds": 900,
+      "silence_timeout_seconds": 180,
+      "actions_completed": 12,
+      "restart_used": false
+    }
+  },
+  "blind_and_oracle": {
+    "blind_note_id": "9c1b429fe6f742058956060b6e4126bd",
+    "blind_notes_artifact": "first-judgment.md",
+    "blind_notes_written_before_dom": true,
+    "oracle_audit_id": "a39934f0b1c84e829199879011652956",
+    "oracle_audit_count": 1,
+    "oracle_sources": "visible local navigation and participation state transitions",
+    "oracle_provenance": "runtime-assertion",
+    "unsupported_claims": "backend transaction truth, human comprehension, visual geometry without screenshot"
+  },
+  "core_outcome": {
+    "statement": "The participant-specific action 모임 참여 취소하기 is present with 현재 상태: OPEN on the participant detail, disappears behind the 로그인 필요 gate on reload of the exact detail URL, and returns on the same exact detail URL after visible phone+OTP reauthentication.",
+    "detail_url_before": "http://localhost:3117/meetups/ec6f99c1-b0e4-4d41-bb01-1c5044fb95fb",
+    "detail_url_after": "http://localhost:3117/meetups/ec6f99c1-b0e4-4d41-bb01-1c5044fb95fb",
+    "action_before": "모임 참여 취소하기",
+    "action_after": "모임 참여 취소하기",
+    "state_before": "OPEN",
+    "state_after": "OPEN",
+    "core_flow_evidence_id": "f491de28e66d4d8d998ea6e90cec8249",
+    "core_flow_status": "tested-pass"
+  },
+  "checkpoints": [
+    {"n": 1, "step": "navigate-initial-url", "route": "http://localhost:3117/", "origin": "http://localhost:3117", "result_id": "1df5d126c8e843589ec139c3e86fe7ee", "checkpoint_id": "23527e016d394ec8b71fc3308f1f0666"},
+    {"n": 2, "step": "click-visible-login-control", "route": "http://localhost:3117/", "origin": "http://localhost:3117", "result_id": "e0ffcea82917482a805330916fd33019", "checkpoint_id": "78c29785d0cf4560b2015559da212061"},
+    {"n": 3, "step": "submit-phone-otp-request", "route": "http://localhost:3117/auth", "origin": "http://localhost:3117", "result_id": "007b01d4b75d4e6b9bf484f730825d42", "checkpoint_id": "5017e1e0fb7143bbb1b20a66f65226e3"},
+    {"n": 4, "step": "submit-otp-code", "route": "http://localhost:3117/", "origin": "http://localhost:3117", "result_id": "b07fa9d052d74092af07cb1cb86cd332", "checkpoint_id": "1d74b1785a824e16b3081501688b85b2"},
+    {"n": 5, "step": "open-my-meetups-via-visible-nav", "route": "http://localhost:3117/my-meetups", "origin": "http://localhost:3117", "result_id": "8655d6edd53244a6a45bc78692c0cf57", "checkpoint_id": "13b76284c36c4dd19f364617c9507d07"},
+    {"n": 6, "step": "open-participant-meetup-detail", "route": "http://localhost:3117/meetups/ec6f99c1-b0e4-4d41-bb01-1c5044fb95fb", "origin": "http://localhost:3117", "result_id": "18e69c0071a94b4997c722547c4fdf35", "checkpoint_id": "b30e15d945624f8090fbba0c27662f5b"},
+    {"n": 7, "step": "reload-participant-detail-url", "route": "http://localhost:3117/meetups/ec6f99c1-b0e4-4d41-bb01-1c5044fb95fb", "origin": "http://localhost:3117", "result_id": "0d34bb38ee234870a7b25da9ecde025a", "checkpoint_id": "71da1f1997d54fe88d476deb40c32b61"},
+    {"n": 8, "step": "follow-visible-login-control-from-gate", "route": "http://localhost:3117/auth?next=%2Fmeetups%2Fec6f99c1-b0e4-4d41-bb01-1c5044fb95fb", "origin": "http://localhost:3117", "result_id": "9767c2a32cbb40dca3b6b02024d45c4b", "checkpoint_id": "f3f63547b5114e908c1f266b82147572"},
+    {"n": 9, "step": "reauthenticate-phone-and-otp", "route": "http://localhost:3117/meetups/ec6f99c1-b0e4-4d41-bb01-1c5044fb95fb", "origin": "http://localhost:3117", "result_id": "f491de28e66d4d8d998ea6e90cec8249", "checkpoint_id": "6f08e5f5d94d4f68b94221c26382547b"},
+    {"n": 10, "step": "narrow-viewport-participant-action-check", "route": "http://localhost:3117/meetups/ec6f99c1-b0e4-4d41-bb01-1c5044fb95fb", "origin": "http://localhost:3117", "result_id": "fa50fd97595c4f6c89e35581bb41ed49", "checkpoint_id": "b32aeff0da954276b99b5303ed0dacae"},
+    {"n": 11, "step": "keyboard-focus-check-participant-action", "route": "http://localhost:3117/meetups/ec6f99c1-b0e4-4d41-bb01-1c5044fb95fb", "origin": "http://localhost:3117", "result_id": "36de19c45dd34182acf8c6015e56cbba", "checkpoint_id": "dcd698978c154c11b436a8065ec3bc66"},
+    {"n": 12, "step": "hit-test-participant-action-for-overlay", "route": "http://localhost:3117/meetups/ec6f99c1-b0e4-4d41-bb01-1c5044fb95fb", "origin": "http://localhost:3117", "result_id": "3bb3df147ab247f08f8b856f87f71b4b", "checkpoint_id": "5491a52394be4fc688b162525332c60b"}
+  ],
+  "findings": [
+    {
+      "id": "F1",
+      "kind": "functional",
+      "status": "success",
+      "observed": "Detail at /meetups/ec6f99c1-b0e4-4d41-bb01-1c5044fb95fb showed 현재 상태: OPEN, 인원 현재 2명 · 최소 2명 · 정원 4명, and the participant action 모임 참여 취소하기.",
+      "interpretation": "The QA-1 participant identity holds an active participation and the screen exposes the matching participant action.",
+      "friction": "none",
+      "evidence_id": "18e69c0071a94b4997c722547c4fdf35"
+    },
+    {
+      "id": "F2",
+      "kind": "functional",
+      "status": "success",
+      "observed": "Reloading the exact detail URL replaced the content with a 로그인 필요 gate (heading 로그인하고 모임을 확인해 주세요) and removed OPEN and 모임 참여 취소하기.",
+      "interpretation": "The session boundary is enforced on reload rather than rendering stale cached detail.",
+      "friction": "none",
+      "evidence_id": "0d34bb38ee234870a7b25da9ecde025a"
+    },
+    {
+      "id": "F3",
+      "kind": "functional",
+      "status": "success",
+      "observed": "The gate's login anchor carried next=%2Fmeetups%2Fec6f99c1-b0e4-4d41-bb01-1c5044fb95fb; after phone+OTP the app returned to the same detail URL with 현재 상태: OPEN and 모임 참여 취소하기 restored.",
+      "interpretation": "Return-to-intent works, and the restored participant action is the load-bearing outcome, not merely URL equality.",
+      "friction": "none",
+      "evidence_id": "f491de28e66d4d8d998ea6e90cec8249"
+    },
+    {
+      "id": "F4",
+      "kind": "accessibility",
+      "status": "success_with_friction",
+      "observed": "Tab order reached 뒤로가기, 신고하기, 모임 참여 취소하기 with solid 2px focus outlines, then NEXTJS-PORTAL, 설치, 설치 배너 닫기, 새로고침, BODY.",
+      "interpretation": "The participant action is keyboard reachable with visible focus; install and new-version banner buttons interleave into the tab order after the primary action.",
+      "friction": "Keyboard users traverse two promotional banners between the primary action and the end of the page.",
+      "evidence_id": "36de19c45dd34182acf8c6015e56cbba"
+    },
+    {
+      "id": "F5",
+      "kind": "functional",
+      "status": "non-reproduced",
+      "observed": "elementFromPoint at the center of 모임 참여 취소하기 returned the button itself; ancestors footer.bottom-action-bar z-10 > main > div.route-transition > div.route-gesture-surface--foreground > div.route-stage.",
+      "interpretation": "No overlay intercepts the participant action on the restored detail in this run, so the Actor's reported intercepted-pointer friction did not reproduce.",
+      "friction": "none observed here; the route-gesture-surface--foreground layer remains an untested hypothesis, not a verified root cause.",
+      "evidence_id": "3bb3df147ab247f08f8b856f87f71b4b"
+    }
+  ],
+  "scores": {
+    "task_completion": 4,
+    "findability": 4,
+    "feedback_visibility": 4,
+    "interaction_clarity": 4,
+    "error_recovery": 3,
+    "consistency": 4,
+    "accessibility_basics": 3,
+    "perceived_friction": 3
+  },
+  "score_notes": {
+    "error_recovery": "번호 수정 and 인증번호 다시 받기 give recovery paths; invalid-input and expired-OTP paths were not exercised.",
+    "accessibility_basics": "Keyboard reachability and visible focus confirmed; no automated a11y scan and no screen-reader evidence, so this is not proof of screen-reader usability.",
+    "perceived_friction": "Return path itself is frictionless; a second OTP round-trip was required for the same account after reload, and two promotional banners sit in the pre-action tab order."
+  },
+  "coverage": {
+    "tested": [
+      "initial landing and logged-out gating copy",
+      "visible login entry control",
+      "phone submit and OTP step",
+      "OTP submit and authenticated landing",
+      "내 모임 visible navigation",
+      "participant meetup detail with OPEN state",
+      "모임 참여 취소하기 presence before auth boundary",
+      "detail reload gate with next-parameter preservation",
+      "reauthentication via visible phone and OTP controls",
+      "same detail URL, OPEN state, and participant action after reauth",
+      "390x844 semantic reachability of detail and participant action",
+      "keyboard traversal and focus visibility on the participant action",
+      "pointer hit test for overlay interception on the participant action"
+    ],
+    "skipped": [
+      {"item": "visual geometry, hierarchy, density, clipping, design intent", "reason": "Page.captureScreenshot timed out twice (CdpRequestTimeoutError, deviceScaleFactor 3 and 1); no screenshot exists and shots/ is empty; marked untested."},
+      {"item": "activation of 모임 참여 취소하기", "reason": "destructive participation mutation, out of scope"},
+      {"item": "invalid/expired OTP, phone format rejection, OTP rate limiting", "reason": "not contracted; no such path exercised; second OTP was not rate-limited"},
+      {"item": "backend transaction truth", "reason": "no human-approved or source-backed oracle; reported untested"},
+      {"item": "screen-reader usability and automated a11y scan", "reason": "not run"},
+      {"item": "Actor-reported pointer interception root cause", "reason": "non-reproduced on fresh state and no independent oracle"}
+    ],
+    "defects_claimed": 0,
+    "reproduce_defect_events": 0
+  },
+  "validator": {
+    "command": "qa_event.py finish --queue-remaining 0 --core-flow-status tested-pass --core-flow-evidence-id f491de28e66d4d8d998ea6e90cec8249 --completion-scope qa-complete",
+    "verdict_id": "70440a4386b04e9fbc9ab73880481b63",
+    "result": {"artifacts": [], "errors": [], "events": 39, "valid": true, "worker_id": "qa-bungae-dsp-20260914"},
+    "completion_scope": "qa-complete",
+    "queue_remaining": 0
+  },
+  "prohibitions_respected": {
+    "app_modified": false,
+    "credentials_exposed": false,
+    "authentication_values_printed": false,
+    "raw_actor_evidence_read": false,
+    "earlier_qa_sessions_read": false,
+    "source_or_bundles_read": false,
+    "private_stores_or_tokens_read": false,
+    "undocumented_apis_used": false,
+    "actor_screenshot_used": false,
+    "direct_goto_after_initial_url": false,
+    "origin_changes": 0,
+    "otp_requests_used": 2
+  }
+}
