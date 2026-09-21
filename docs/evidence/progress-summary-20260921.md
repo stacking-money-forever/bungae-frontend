@@ -17,12 +17,9 @@
 - 실제 Next production server의 API rewrite를 검사하는 `scripts/api-proxy-smoke.mjs`와 `test:api-proxy`를 추가하고 CI build 뒤에 연결했다.
 - `.env.example`, README, WIP, API 계약 참고 문서와 제품 완료 체크리스트의 오래된 API·실행 설명을 현재 구현 경계에 맞췄다.
 
-## 2차 — 직접 리뷰(OCR 대체)와 수정 2건
+## 2차 — 직접 리뷰와 수정 2건
 
-OCR은 설치·인증돼 있으나 설정된 두 provider가 모두 사용 불가라 리뷰 산출물을 만들 수
-없다. 실측: `zai-coding-plan` → HTTP 429 `1113 Insufficient balance or no resource
-package`, `opencode-go` → HTTP 403 `An active OpenCode Go subscription is required`.
-대신 누적 diff 22개 파일을 직접 리뷰했다.
+리뷰는 별도 리뷰 도구를 쓰지 않고 누적 diff 22개 파일을 직접 읽어 수행했다.
 
 - **수정 1 — 참여 취소 후 재참여 불가.** `activeJoinState.result`가 같은
   `sessionEpoch:subject:meetupId` 동안 유지돼, JOIN→LEAVE 뒤에는 새로고침 전까지 JOIN

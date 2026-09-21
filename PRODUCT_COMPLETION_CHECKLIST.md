@@ -126,7 +126,7 @@
   - 2026-09-21 분류: 코드 수정 22개 파일(설정 1, 소스 7, 테스트 6, 문서 5, CI/패키지 2, `.gitignore` 1), 신규 파일 5개(`next.config.ts`, `scripts/api-proxy-smoke.mjs`, `src/lib/api/backend-rewrite.test.ts`, `.env.example`, `docs/evidence/progress-summary-20260921.md`), 이관 QA 증거 65개. 리뷰 수정 2건은 회귀 테스트와 함께 반영됐다. 상세: `docs/evidence/progress-summary-20260921.md`.
 - [ ] 핵심 E2E와 production smoke가 최종 revision에 묶여 있다.
 - [ ] 독립 코드 리뷰와 공격적 QA에서 차단 finding이 없다.
-  - 2026-09-21 OCR은 설정된 두 provider가 모두 사용 불가(`zai-coding-plan` 429 잔액, `opencode-go` 403 구독)라 실행되지 않았고, Codex 직접 리뷰로 발견 2건(참여 취소 뒤 재참여 불가, relation 조회 실패 문구)을 수정했다. 제3자 독립 리뷰 증거는 아직 없다.
+  - 2026-09-21 독립 리뷰는 수행하지 않았고, 직접 리뷰로 발견 2건(참여 취소 뒤 재참여 불가, relation 조회 실패 문구)을 수정했다. 제3자 독립 리뷰 증거는 아직 없다.
 - [x] 모든 미검증 범위와 외부 수동 게이트를 명시한다.
   - `docs/evidence/progress-summary-20260921.md`의 "미검증·외부 권한 또는 환경 차단" 절에 실 SMS·생성 수명주기·실기기·원격 CI/deploy·release 추적·보존 정책·사람 QA 0건을 나열했다.
 - [ ] G0–G7의 필수 항목이 모두 닫힌 뒤에만 완료로 판정한다.
