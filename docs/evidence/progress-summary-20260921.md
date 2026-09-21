@@ -127,4 +127,4 @@ HTTPS로 살아 있었다.
 - **합성 런타임 증거:** disposable HTTP upstream + 로컬 `next start`를 이용한 API proxy smoke.
 - **실제 backend 증거(2차 신규):** QA backend `https://bungae-qa.justn.me` + 실제 DB +
   Chromium 390×844에서 익명→OTP→모임 상세 복귀, relation 기반 action 노출 확인.
-- **실제 운영 증거:** commit·push·merge는 이번 구현에서 수행했다(PR #6 → `747fa5b`). deploy·운영 데이터 변경은 하지 않았다. main CI는 `747fa5b`에서 성공했지만 `Deploy production` 워크플로는 같은 커밋에서 `vercel pull` 단계(`Could not retrieve Project Settings.`)로 실패했고, 이 실패는 `de21c76`(2026-09-09)에도 동일하게 존재했다. production 환경변수도 비어 있다.
+- **실제 운영 증거:** commit·push·merge와 production 배포를 이번 구현에서 수행했다(PR #6·#7·#8 → main `083d224`, Vercel production `bungae-review-main-20260906.vercel.app`). 운영 데이터 변경은 하지 않았다. 배포 후 `GET /` 200, `GET /v1/meetups` → 백엔드 `401 application/problem+json`(`instance=/api/v1/meetups`)로 rewrite와 `BUNGAE_API_ORIGIN`이 production에서 동작함을 확인했다. `Deploy production` 워크플로의 자동 실행은 `vercel pull` 단계에서 실패하며, 원인은 `VERCEL_TOKEN`의 team 접근 권한이다(저장소 비밀값 id·production 환경변수는 교정 완료).
