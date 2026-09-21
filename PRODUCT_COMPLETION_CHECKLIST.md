@@ -106,9 +106,10 @@
   - Aggregate evidence task(`privacyArtifactScan` → `gcfSemanticCheck`/report tasks)는 아직 configuration-cache 비호환이고, frozen validator가 Git·unreachable object·primary checkout·Trash 어디에도 없는 ignored `.gjc` 입력 두 개를 요구해 clean worktree에서 실패한다. 원본 spec SHA-256 `c7650ad1…94059a`와 plan SHA-256 `57439cd8…05f5a`에 정확히 일치하는 authoritative bytes를 복구하기 전에는 portable tracked bundle을 만들 수 없다. Hash-only 재창작은 금지한다.
 - [ ] Preview가 production DB·Push·사용자 데이터에 연결되지 않음을 증명한다.
 - [ ] 정식 domain/HTTPS/callback/환경변수/비밀키 구성을 검증한다.
-  - 2026-09-21 실측: 저장소의 `Deploy production` 워크플로(`.github/workflows/deploy.yml`)가 `workflow_run`으로 CI 성공 뒤 실행되지만, `npx vercel pull`에서 `Error: Could not retrieve Project Settings.`로 실패한다. 커밋 `de21c76`(2026-09-09)과 merge된 `747fa5b`(2026-09-21) 모두 같은 지점에서 실패했고 CI 자체는 성공한다.
-  - Vercel 프로젝트는 `bungae-review-main-20260906`(`prj_0ONMJrtYFsWnU3zCe0ixUPCWBs6P`, team `team_qikOEJyCAyZzZTFgeOD57Oeis`)로 존재하고, `vercel link`로 확인한 이 조합에서는 로컬 `vercel pull`이 성공한다. 즉 저장소 비밀값 `VERCEL_PROJECT_ID`/`VERCEL_ORG_ID`(2026-09-07 설정)가 현재 프로젝트와 맞지 않는다.
-  - 같은 프로젝트의 production 환경변수는 비어 있다(`VERCEL_*`·`TURBO_*` 시스템 값만 존재). 따라서 배포가 성공하더라도 `BUNGAE_API_ORIGIN`이 없어 same-origin `/v1/*`가 백엔드로 전달되지 않는다. production 배포와 그 환경설정은 사용자 Vercel/GitHub 계정 작업이며 저장소 코드만으로 닫을 수 없다.
+  - 2026-09-21 실측: 저장소의 `Deploy production` 워크플로(`.github/workflows/deploy.yml`)는 `npx vercel pull`에서 `Could not retrieve Project Settings.`로 실패한다. 같은 조건을 로컬에서 재현해 원인을 분리했다. 잘못된 `VERCEL_ORG_ID` + 올바른 `VERCEL_PROJECT_ID`가 정확히 이 문구를 만들고, 잘못된 project id는 `Project not found`, 거부된 token은 `The token provided via --token was rejected.`를 만든다.
+  - 저장소 비밀값을 실제 프로젝트 값(`VERCEL_PROJECT_ID=prj_0ONMJrtYFsWnU3zCe0ixUPCWBs6P`, `VERCEL_ORG_ID=team_qikOEJyCAyZzZTFgeOD57Oeis`)으로 교정한 뒤에도 같은 단계에서 동일하게 실패했다. 로컬에서는 같은 id 조합과 CLI 세션 인증으로 `vercel pull`·`vercel build`·`vercel deploy`가 모두 성공하므로, 남은 원인은 `VERCEL_TOKEN`의 team 접근 권한이다. CLI에서 `vercel tokens add`는 `Cannot create tokens for this app.`으로 거부돼 저장소만으로는 토큰을 만들 수 없다.
+  - production 환경변수는 비어 있었고, `BUNGAE_API_ORIGIN`을 추가할 때 CLI 기본값이 `Secret` 타입이라 `vercel pull`이 `BUNGAE_API_ORIGIN="[SENSITIVE]"`로 내려주고 `next.config.ts` 검증이 fail-closed로 build를 중단시켰다. `--no-sensitive`(Config 타입)로 다시 넣은 뒤 정상화했다. 배포 자동화를 쓸 때는 이 타입 차이가 build 실패로 이어지므로 Config 타입이어야 한다.
+  - 2026-09-21 로컬 세션으로 production 배포를 실행해 `https://bungae-review-main-20260906.vercel.app`이 현재 revision을 서빙함을 확인했다(`GET /` 200, `GET /v1/meetups` → 백엔드 `401 application/problem+json`, `instance=/api/v1/meetups`). 즉 rewrite와 `BUNGAE_API_ORIGIN`은 production에서 동작한다. CI 자동 배포만 token 권한 때문에 남아 있다.
 - [ ] 대표 기기·네트워크의 초기 표시, 입력 반응, 레이아웃 안정성, 반복 탭 전환 예산을 정하고 측정한다.
 
 ## G6. 운영·관측·롤백
