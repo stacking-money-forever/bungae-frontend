@@ -123,7 +123,7 @@ describe("Bungae API client", () => {
     ]);
   });
 
-  it("sends activity-policy authorization and a bodyless verification-session request", async () => {
+  it("sends activity-policy authorization and the verification-session return URL as JSON", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
@@ -157,7 +157,7 @@ describe("Bungae API client", () => {
     const api = createBungaeApi({ fetchImpl: fetchMock as unknown as typeof fetch });
 
     await api.getActivityPolicies("access-token", "walk");
-    await api.createVerificationSession("access-token");
+    await api.createVerificationSession("https://app.example/profile", "access-token");
 
     expect(fetchMock.mock.calls).toEqual([
       [
@@ -166,7 +166,11 @@ describe("Bungae API client", () => {
       ],
       [
         "/v1/me/verification-sessions",
-        { method: "POST", headers: { Authorization: "Bearer access-token" } },
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer access-token" },
+          body: JSON.stringify({ returnUrl: "https://app.example/profile" }),
+        },
       ],
     ]);
   });

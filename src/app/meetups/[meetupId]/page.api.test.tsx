@@ -71,7 +71,7 @@ function createApi(overrides: Partial<BungaeApi> = {}): BungaeApi {
     cancelMeetup: vi.fn(),
     decideQuorum: vi.fn(),
     checkInMeetup: vi.fn(),
-    listMyMeetups: vi.fn(),
+    listMyMeetups: vi.fn().mockResolvedValue({ items: [] }),
     listNotifications: vi.fn(),
     markNotificationRead: vi.fn(),
     markAllNotificationsRead: vi.fn(),
@@ -130,6 +130,17 @@ beforeEach(() => {
 });
 
 describe("authenticated meetup detail API", () => {
+  it("links anonymous visitors to auth with a safe return to this meetup", () => {
+    const api = createApi();
+    render(<AuthSessionProvider api={api}><MeetupDetailPage /></AuthSessionProvider>);
+
+    expect(screen.getByRole("heading", { name: "로그인하고 모임을 확인해 주세요" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "휴대전화로 로그인하기" })).toHaveAttribute(
+      "href",
+      `/auth?next=${encodeURIComponent(`/meetups/${encodeURIComponent(meetup.id)}`)}`,
+    );
+  });
+
   it("renders server state, allowed actions, and authorized venue fields when present", async () => {
     const api = createApi();
     render(<AuthSessionProvider api={api}><SignedInDetail /></AuthSessionProvider>);
@@ -369,6 +380,37 @@ describe("authenticated meetup detail API", () => {
     expect(screen.queryByRole("link", { name: "체크인하기" })).not.toBeInTheDocument();
   });
 
+  it("uses the participant relation when backend detail still advertises global JOIN", async () => {
+    const api = createApi({
+      getMeetup: vi.fn().mockResolvedValue({ ...meetup, allowedActions: ["JOIN"] }),
+      listMyMeetups: vi.fn().mockResolvedValue({
+        items: [{ id: meetup.id, title: meetup.title, state: "OPEN", relation: "PARTICIPANT", startsAt: meetup.startsAt }],
+      }),
+    });
+    render(<AuthSessionProvider api={api}><SignedInDetail /></AuthSessionProvider>);
+
+    expect(await screen.findByRole("button", { name: "모임 참여 취소하기" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "이 모임에 참여하기" })).not.toBeInTheDocument();
+    expect(screen.queryByText("참여 가능한 모임이에요.")).not.toBeInTheDocument();
+  });
+
+  it("follows relation cursors and stops when a backend cursor repeats", async () => {
+    const listMyMeetups = vi
+      .fn()
+      .mockResolvedValueOnce({ items: [], nextCursor: "page-2" })
+      .mockResolvedValueOnce({ items: [], nextCursor: "page-2" });
+    const api = createApi({
+      getMeetup: vi.fn().mockResolvedValue({ ...meetup, allowedActions: ["JOIN"] }),
+      listMyMeetups,
+    });
+    render(<AuthSessionProvider api={api}><SignedInDetail /></AuthSessionProvider>);
+
+    expect(await screen.findByRole("button", { name: "이 모임에 참여하기" })).toBeEnabled();
+    expect(listMyMeetups).toHaveBeenCalledTimes(2);
+    expect(listMyMeetups).toHaveBeenNthCalledWith(1, { relation: "ALL", cursor: undefined, limit: 100 }, "access");
+    expect(listMyMeetups).toHaveBeenNthCalledWith(2, { relation: "ALL", cursor: "page-2", limit: 100 }, "access");
+  });
+
   it("renders no server actions for an empty detail projection", async () => {
     const api = createApi({
       getMeetup: vi.fn().mockResolvedValue({ ...meetup, allowedActions: [] }),
@@ -395,7 +437,14 @@ describe("authenticated meetup detail API", () => {
           capacity: 4,
           quorumStatus: "PENDING",
         }),
-      getMeetup: vi.fn().mockResolvedValue({ ...meetup, allowedActions: ["JOIN"] }),
+      listMyMeetups: vi.fn()
+        .mockResolvedValueOnce({ items: [] })
+        .mockResolvedValueOnce({ items: [] })
+        .mockResolvedValueOnce({ items: [{ id: meetup.id, relation: "PARTICIPANT", title: meetup.title, state: "OPEN", startsAt: meetup.startsAt }] }),
+      getMeetup: vi.fn()
+        .mockResolvedValueOnce({ ...meetup, allowedActions: ["JOIN"] })
+        .mockResolvedValueOnce({ ...meetup, allowedActions: ["JOIN"] })
+        .mockResolvedValueOnce({ ...meetup, joinedCount: 2, allowedActions: ["JOIN"] }),
     });
     render(<AuthSessionProvider api={api}><SignedInDetail /></AuthSessionProvider>);
 
@@ -413,6 +462,10 @@ describe("authenticated meetup detail API", () => {
       "access",
     );
     await waitFor(() => expect(api.getMeetup).toHaveBeenCalledTimes(3));
+    expect(await screen.findByText("참여가 완료됐어요.")).toHaveAttribute("role", "status");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "모임 참여 취소하기" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "이 모임에 참여하기" })).not.toBeInTheDocument();
   });
 
   it("refreshes detail after a successful LEAVE without claiming an optimistic state", async () => {
@@ -430,6 +483,55 @@ describe("authenticated meetup detail API", () => {
     expect(api.leaveMeetup).toHaveBeenCalledWith(meetup.id, "access");
     expect(api.getMeetup).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole("button", { name: "모임 참여 취소하기" })).not.toBeInTheDocument();
+  });
+
+  it("offers JOIN again after a successful LEAVE with a fresh idempotency key", async () => {
+    const api = createApi({
+      joinMeetup: vi.fn().mockResolvedValue({
+        participationId: user.id,
+        state: "JOINED",
+        meetupState: "OPEN",
+        joinedCount: 2,
+        capacity: 4,
+        quorumStatus: "PENDING",
+      }),
+      leaveMeetup: vi.fn().mockResolvedValue(undefined),
+      getMeetup: vi.fn().mockResolvedValue({ ...meetup, allowedActions: ["JOIN"] }),
+      listMyMeetups: vi.fn()
+        .mockResolvedValueOnce({ items: [] })
+        .mockResolvedValueOnce({ items: [{ id: meetup.id, relation: "PARTICIPANT", title: meetup.title, state: "OPEN", startsAt: meetup.startsAt }] })
+        .mockResolvedValueOnce({ items: [] }),
+    });
+    render(<AuthSessionProvider api={api}><SignedInDetail /></AuthSessionProvider>);
+
+    fireEvent.click(await screen.findByRole("button", { name: "이 모임에 참여하기" }));
+    expect(await screen.findByText("참여가 완료됐어요.")).toHaveAttribute("role", "status");
+
+    fireEvent.click(await screen.findByRole("button", { name: "모임 참여 취소하기" }));
+    expect(await screen.findByText("참여를 취소했어요. 서버 상태를 새로 확인했어요.")).toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole("button", { name: "이 모임에 참여하기" }));
+
+    await waitFor(() => expect(api.joinMeetup).toHaveBeenCalledTimes(2));
+    const keys = vi.mocked(api.joinMeetup).mock.calls.map((call) => call[1]);
+    expect(keys[1]).not.toBe(keys[0]);
+  });
+
+  it("reports a failed participation check as its own error and recovers on retry", async () => {
+    const api = createApi({
+      getMeetup: vi.fn().mockResolvedValue({ ...meetup, allowedActions: ["JOIN"] }),
+      listMyMeetups: vi.fn()
+        .mockRejectedValueOnce(new ApiProblemError(503, null))
+        .mockResolvedValueOnce({ items: [{ id: meetup.id, relation: "PARTICIPANT", title: meetup.title, state: "OPEN", startsAt: meetup.startsAt }] }),
+    });
+    render(<AuthSessionProvider api={api}><SignedInDetail /></AuthSessionProvider>);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("참여 여부를 확인하지 못했어요.");
+    expect(screen.queryByRole("button", { name: "이 모임에 참여하기" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+
+    expect(await screen.findByRole("button", { name: "모임 참여 취소하기" })).toBeEnabled();
   });
 
   it("refreshes detail after a LEAVE error and permits a retry", async () => {

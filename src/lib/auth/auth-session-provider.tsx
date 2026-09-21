@@ -87,7 +87,7 @@ export type AuthSessionContextValue = {
   getMe(): Promise<UserProfile>;
   updateMe(input: ProfilePatch, version: number): Promise<UserProfile>;
   getActivityPolicies(cursor?: string): Promise<ActivityPolicyPage>;
-  createVerificationSession(): Promise<VerificationSession>;
+  createVerificationSession(returnUrl: string): Promise<VerificationSession>;
   getWithdrawal(): Promise<Withdrawal | null>;
   scheduleWithdrawal(idempotencyKey: string): Promise<Withdrawal>;
   cancelWithdrawal(version: number): Promise<void>;
@@ -221,7 +221,7 @@ export function AuthSessionProvider({
     [store],
   );
   const createVerificationSession = useCallback(
-    () => store.createVerificationSession(),
+    (returnUrl: string) => store.createVerificationSession(returnUrl),
     [store],
   );
   const getWithdrawal = useCallback(() => store.getWithdrawal(), [store]);

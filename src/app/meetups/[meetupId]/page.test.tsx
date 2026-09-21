@@ -64,7 +64,7 @@ function createApi(overrides: Partial<BungaeApi> = {}): BungaeApi {
     cancelMeetup: vi.fn(),
     decideQuorum: vi.fn(),
     checkInMeetup: vi.fn(),
-    listMyMeetups: vi.fn(),
+    listMyMeetups: vi.fn().mockResolvedValue({ items: [] }),
     listNotifications: vi.fn(),
     markNotificationRead: vi.fn(),
     markAllNotificationsRead: vi.fn(),
