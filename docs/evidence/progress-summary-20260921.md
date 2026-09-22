@@ -110,6 +110,37 @@ HTTPS로 살아 있었다.
 - 독립 리뷰: `codex review --base main`(2026-09-21, model `gpt-5.6-terra`, medium) — 차단 finding 없음. 같은 실행에서 `typecheck`·`lint`·production `build`·`test:api-proxy`를 재실행해 통과했다.
 - `git diff --check`: 통과. package-lock은 기준 revision과 동일.
 
+## 3차 — 백엔드 재배포 (2026-09-22)
+
+기존 QA 스택은 사용자가 제거했고(`rapi-agent:~/bungae-qa` 삭제, 컨테이너·볼륨 정리), 같은 호스트에
+새 백엔드를 독립 스택으로 배포했다.
+
+- 호스트: `rapi-agent`(Tailscale `100.96.95.72`, pve VM 101) → `~/bungae-api`
+- 스택(`name: bungae-api`): `bungae-api-api-1`(Spring Boot, `bungae-backend` `dfa7a2e`를 `bootJar`로
+  빌드한 94MB jar), `bungae-api-postgres-1`(postgres:16.4-alpine), `bungae-api-redis-1`(redis:7.2.5),
+  `bungae-api-tunnel-1`(`cloudflare/cloudflared:2026.8.2`). API는 `127.0.0.1:18084` 로컬 바인드만 한다.
+- 새 Cloudflare 터널 `bungae-api`(`b8cec543-6175-475a-8166-91b20b1a8f95`) + DNS `bungae-api.justn.me`
+  → `http://127.0.0.1:18084`. 기존 터널 `bungae-qa`와 그 자격증명은 삭제했다.
+- 비밀값은 새로 생성했다: DB 비밀번호, `CURSOR_HMAC_KEY`, `AUTH_DESTINATION_ENCRYPTION_KEY`,
+  `PUSH_TOKEN_ENCRYPTION_KEY`, `PUSH_TOKEN_FINGERPRINT_KEY`, RSA 2048 JWT 키페어(`file:` 리소스 경로로 마운트).
+  provider는 전부 기본 비활성(`NHN_SMS_ENABLED`, `PORTONE_ENABLED`, `FCM_ENABLED`, `KAKAO_LOCAL_ENABLED`,
+  `MINIO_ENABLED`, `OUTBOX_DISPATCHER_ENABLED` 모두 미설정).
+- Flyway가 기동 시 migration 10건을 적용했고 activity policy `COFFEE`/`DINING`/`WALK`가 시드됐다.
+- 실제 SMS·본인인증 provider가 없어 로그인이 불가능하므로, 이전 QA와 동일한 DB 측 affordance
+  (`qa_login_allowlist` + OTP/PROFILE trigger, `qa-accounts.sql`/`create-accounts.py`)를 새 DB에 적용해
+  고정 코드 로그인 3계정을 만들었다. **QA/staging DB 전용이며 production DB에 적용하면 안 된다.**
+- 실측: `GET https://bungae-api.justn.me/api/v1/meetups` → `401 UNAUTHENTICATED`, QA-1 OTP `202` →
+  로그인 `201`(`adultVerified`/`identityVerified` true) → `/me` `200` → activity-policies `200` → meetups 0건.
+- 프론트 전환: Vercel 프로젝트 환경변수 `BUNGAE_API_ORIGIN=https://bungae-api.justn.me`를
+  production·preview 양쪽에 `Config` 타입으로 설정하고 production을 재배포했다. 이제
+  `https://bungae-review-main-20260906.vercel.app/v1/meetups`가 새 백엔드의 `401`을 반환한다.
+- production 브라우저 실측(Chromium 390×844): 익명 홈 → `/auth` → QA-1 로그인 성공 → 인증된 홈이
+  서버 상태로 렌더(`모임 0개`, 새 DB라 정직한 빈 상태). `/auth?next=/my-meetups`는 허용 경로가 아니라
+  홈으로 fallback되는 것도 함께 확인됐다.
+- 남은 정리: `bungae-qa.justn.me` DNS 레코드는 터널 삭제 후에도 남아 `530`을 반환한다(Cloudflare DNS
+  삭제는 대시보드/API 토큰 필요, 이 Mac에 토큰 없음). 또한 시드 데이터가 없어 프론트에서 모임 생성은
+  장소 provider(`KAKAO_LOCAL_ENABLED`)가 필요하고, provider 자격증명이 없으면 불가하다.
+
 ## 미검증·외부 권한 또는 환경 차단
 
 - 실제 휴대전화 SMS 수신과 성인·본인인증 provider redirect/callback(HTTPS 배포 필요)
@@ -126,5 +157,5 @@ HTTPS로 살아 있었다.
 - **로컬 코드 증거:** Vitest, typecheck, lint, production build, 77개 Playwright 회귀.
 - **합성 런타임 증거:** disposable HTTP upstream + 로컬 `next start`를 이용한 API proxy smoke.
 - **실제 backend 증거(2차 신규):** QA backend `https://bungae-qa.justn.me` + 실제 DB +
-  Chromium 390×844에서 익명→OTP→모임 상세 복귀, relation 기반 action 노출 확인.
+  Chromium 390×844에서 익명→OTP→모임 상세 복귀, relation 기반 action 노출 확인. 09-22에는 그 스택을 제거하고 `https://bungae-api.justn.me`(rapi-agent `~/bungae-api`)로 재배포했다.
 - **실제 운영 증거:** commit·push·merge와 production 배포를 이번 구현에서 수행했다(PR #6·#7·#8 → main `083d224`, Vercel production `bungae-review-main-20260906.vercel.app`). 운영 데이터 변경은 하지 않았다. 배포 후 `GET /` 200, `GET /v1/meetups` → 백엔드 `401 application/problem+json`(`instance=/api/v1/meetups`)로 rewrite와 `BUNGAE_API_ORIGIN`이 production에서 동작함을 확인했다. 배포 경로는 Vercel Git 연동(`stacking-money-forever/bungae-frontend` public ↔ `bungae-review-main-20260906`, production branch `main`)으로 전환했고, 토큰 기반 `Deploy production` 워크플로는 비활성화 후 파일을 제거했다. org private repo는 Hobby 플랜에서 연동이 거부되어(`409 ... Upgrade to Pro`) 저장소를 public으로 전환했으며, 공개 전 히스토리 55개 커밋을 스캔해 키·토큰·실제 개인정보가 없음을 확인했다.
