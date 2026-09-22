@@ -115,7 +115,7 @@ HTTPS로 살아 있었다.
 기존 QA 스택은 사용자가 제거했고(`rapi-agent:~/bungae-qa` 삭제, 컨테이너·볼륨 정리), 같은 호스트에
 새 백엔드를 독립 스택으로 배포했다.
 
-- 호스트: `rapi-agent`(Tailscale `100.96.95.72`, pve VM 101) → `~/bungae-api`
+- 호스트: 당시 `rapi-agent`(pve VM 101) → `~/bungae-api` (2026-09-22에 pve VM 103으로 이관, 5차 참조)
 - 스택(`name: bungae-api`): `bungae-api-api-1`(Spring Boot, `bungae-backend` `dfa7a2e`를 `bootJar`로
   빌드한 94MB jar), `bungae-api-postgres-1`(postgres:16.4-alpine), `bungae-api-redis-1`(redis:7.2.5),
   `bungae-api-tunnel-1`(`cloudflare/cloudflared:2026.8.2`). API는 `127.0.0.1:18084` 로컬 바인드만 한다.
@@ -157,6 +157,23 @@ NHN Cloud는 2023-12-15 이후 가입한 개인 회원에게 SMS를 제공하지
   `SMS_PROVIDER=aligo`, `ALIGO_SMS_ENABLED=true`, `ALIGO_SMS_KEY`, `ALIGO_SMS_USER_ID`,
   `ALIGO_SMS_SENDER_NUMBER`, `OUTBOX_DISPATCHER_ENABLED=true`. 개인 계정 API는 일 500건 제한이고,
   발송 접수(`result_code > 0`)는 수신 성공이 아니다.
+
+## 5차 — 백엔드 호스트 이관 (2026-09-22)
+
+`rapi-agent`에서 다른 곳으로 옮기기로 해서 **pve VM 103(`bungae-api`)** 로 이관했다. VM은 사용자의 전용
+Proxmox 에이전트가 생성했고(4 vCPU / 8GB / 80GB, Ubuntu 24.04, Docker 29.8.1, swap 2GB, UTC, ufw
+LAN-only SSH, Tailscale 미가입), 애플리케이션 배포는 내가 이어서 했다.
+
+- 새 호스트: `bungae-api` / `192.168.0.10` (LAN). Mac은 다른 대역이라 `ssh -J pve justn@192.168.0.10`로 접근한다.
+- 이관 내용: `app.jar`(Aligo adapter 포함), `compose.yml`, `cloudflared.yml`, `credentials.json`, `.env`,
+  JWT 키페어, QA 시딩 스크립트 + **기존 PG 덤프 복원**(migration 10, `qa_login_allowlist` 3, `user_profile` 1, meetup 0).
+- **터널·호스트명 유지**: 같은 터널 `bungae-api`(`b8cec543…`)를 새 VM에서 돌려 `bungae-api.justn.me`가 그대로다.
+  DNS·Vercel 환경변수 변경 0. 전환은 구 호스트 스택 정지 → 새 호스트 기동 순서로 몇 초 내에 끝났다.
+- 검증: 백엔드 공개 `401`, production 프록시 `401`, QA-1 로그인 `202→201`(인증 완료)→`/me` 200,
+  **production 프록시 경유 QA-2 로그인 `202→201`**(Vercel → 새 VM 전체 경로).
+- 운영: `~/bungae-api/backup.sh` + cron(매일 03:17 UTC, 7일 보관)로 `pg_dump`를 `~/bungae-api/backups`에 남긴다.
+- 구 호스트: 컨테이너 정지(`docker compose stop`), 볼륨 `bungae-api_pgdata`는 확인용으로 보존. 정리는
+  `cd ~/bungae-api && docker compose down -v && rm -rf ~/bungae-api`.
 
 ## 미검증·외부 권한 또는 환경 차단
 
