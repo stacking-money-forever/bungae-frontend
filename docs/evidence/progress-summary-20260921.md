@@ -141,6 +141,23 @@ HTTPS로 살아 있었다.
   삭제는 대시보드/API 토큰 필요, 이 Mac에 토큰 없음). 또한 시드 데이터가 없어 프론트에서 모임 생성은
   장소 provider(`KAKAO_LOCAL_ENABLED`)가 필요하고, provider 자격증명이 없으면 불가하다.
 
+## 4차 — OTP 발송 공급자 (2026-09-22)
+
+NHN Cloud는 2023-12-15 이후 가입한 개인 회원에게 SMS를 제공하지 않는다(공식 문서 확인). 사업자
+계정 없이 실사용 로그인을 열기 위해 **Aligo 문자 API adapter를 backend에 구현**했다
+(`bungae-backend` PR #1 → main `9aea875`).
+
+- `ProviderClients.SmsSender` port + `AligoSmsClient`(form `key`/`user_id`/`sender`/`receiver`/`msg`/`msg_type=SMS`,
+  `apis.aligo.in` host pin, 성공은 `result_code > 0`·`error_cnt = 0`·`msg_id` 존재).
+- 공급자 선택은 `providers.sms.provider=nhn|aligo` 하나만. dispatcher가 켜졌는데 provider가 없거나
+  두 공급자가 동시에 enabled면 startup 실패(silent fallback 금지).
+- fixture `docs/providers/fixtures/aligo-sms.json`, surface `PRV-04`, 계약 문서 갱신. `./gradlew test`
+  전체 통과(계약 테스트 포함). 빌드 jar를 `rapi-agent:~/bungae-api`에 재배포해 기동·`401` 확인.
+- live 발송은 Aligo 계정 키와 등록 발신번호가 필요하다(`DEFERRED_CREDENTIAL_GATED`). 켤 때 넣을 값:
+  `SMS_PROVIDER=aligo`, `ALIGO_SMS_ENABLED=true`, `ALIGO_SMS_KEY`, `ALIGO_SMS_USER_ID`,
+  `ALIGO_SMS_SENDER_NUMBER`, `OUTBOX_DISPATCHER_ENABLED=true`. 개인 계정 API는 일 500건 제한이고,
+  발송 접수(`result_code > 0`)는 수신 성공이 아니다.
+
 ## 미검증·외부 권한 또는 환경 차단
 
 - 실제 휴대전화 SMS 수신과 성인·본인인증 provider redirect/callback(HTTPS 배포 필요)
