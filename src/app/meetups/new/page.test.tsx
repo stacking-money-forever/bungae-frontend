@@ -22,7 +22,7 @@ describe("NewMeetupPage", () => {
   it("keeps the anonymous create route behind phone login", () => {
     render(<NewMeetupPage />);
 
-    expect(screen.getByRole("link", { name: "휴대전화로 로그인하기" })).toHaveAttribute("href", "/auth");
+    expect(screen.getByRole("link", { name: "휴대전화로 로그인하기" })).toHaveAttribute("href", "/auth?next=%2Fmeetups%2Fnew");
     expect(screen.queryByRole("button", { name: "모임 만들기" })).not.toBeInTheDocument();
   });
 
@@ -41,24 +41,30 @@ describe("NewMeetupPage", () => {
   });
 
   it("retains creation validation for the authenticated server flow", () => {
-    expect(validateMeetupForm(initialValues)).toEqual({});
+    const confirmed = { selected: true, publicConfirmed: true };
+    expect(validateMeetupForm(initialValues, confirmed)).toEqual({});
 
     expect(
-      validateMeetupForm({
-        ...initialValues,
-        start: "offset-1500",
-        end: "offset-120",
-        place: null,
-        minimum: "1",
-        capacity: "9",
-      }),
+      validateMeetupForm(
+        {
+          ...initialValues,
+          start: "offset-1500",
+          end: "offset-120",
+          minimum: "1",
+          capacity: "9",
+        },
+        { selected: false, publicConfirmed: false },
+      ),
     ).toMatchObject({
       start: "시작 시간은 생성 시점부터 24시간 안이어야 해요.",
       end: "종료 시간은 시작 시간보다 늦어야 해요.",
-      place: "누구나 접근할 수 있는 공개 장소를 선택해 주세요.",
+      place: "서버 장소 검색에서 모임 장소를 선택해 주세요.",
       minimum: "최소 성사 인원은 2명 이상이어야 해요.",
       capacity: "정원은 최소 인원 이상, 최대 8명이어야 해요.",
     });
-    expect(validateMeetupForm(initialValues)).not.toHaveProperty("deadline");
+    expect(validateMeetupForm(initialValues, { selected: true, publicConfirmed: false })).toEqual({
+      place: "누구나 접근할 수 있는 공개 장소인지 확인해 주세요.",
+    });
+    expect(validateMeetupForm(initialValues, confirmed)).not.toHaveProperty("deadline");
   });
 });

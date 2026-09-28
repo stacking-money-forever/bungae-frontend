@@ -195,10 +195,17 @@ describe("NewMeetupPage authenticated place and creation regressions", () => {
     await screen.findByRole("radio", { name: /한강 공원 입구/ });
     submit();
     expect(auth.createMeetup).not.toHaveBeenCalled();
+    expect(screen.getAllByText("서버 장소 검색에서 모임 장소를 선택해 주세요.").length).toBeGreaterThan(0);
+    expect(screen.getByRole("textbox", { name: "장소 검색" })).toHaveAttribute("aria-invalid", "true");
+    expect(screen.queryByText(/비용은/)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("radio", { name: /한강 공원 입구/ }));
+    expect(screen.queryByText("서버 장소 검색에서 모임 장소를 선택해 주세요.")).not.toBeInTheDocument();
     submit();
     expect(auth.createMeetup).not.toHaveBeenCalled();
+    expect(screen.getAllByText("누구나 접근할 수 있는 공개 장소인지 확인해 주세요.").length).toBeGreaterThan(0);
+    expect(screen.getByRole("checkbox", { name: "누구나 접근할 수 있는 공개 장소임을 확인했어요." })).toHaveAccessibleDescription("누구나 접근할 수 있는 공개 장소인지 확인해 주세요.");
+    expect(screen.queryByText(/비용은/)).not.toBeInTheDocument();
   });
 
   it("posts the exact selected provider venue and absolute timestamps", async () => {
