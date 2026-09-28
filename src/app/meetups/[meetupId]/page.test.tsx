@@ -151,7 +151,7 @@ describe("MeetupDetailPage report safety actions", () => {
 
     await openReportWithReason("안전 위협");
     fireEvent.click(screen.getByRole("button", { name: "신고 내용 기록하기" }));
-    expect(screen.queryByText("신고 내용을 이 화면에 기록했어요. 운영 검토 결과가 확정된 것은 아니에요.")).not.toBeInTheDocument();
+    expect(screen.queryByText("신고가 접수됐어요. 운영 검토 결과가 확정된 것은 아니에요.")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "신고 접수 중…" })).toBeDisabled();
 
     await act(async () => {
@@ -159,7 +159,7 @@ describe("MeetupDetailPage report safety actions", () => {
     });
     await waitFor(() => {
       const reportReceipt = screen.getByRole("status");
-      expect(reportReceipt).toHaveTextContent("신고 내용을 이 화면에 기록했어요. 운영 검토 결과가 확정된 것은 아니에요.");
+      expect(reportReceipt).toHaveTextContent("신고가 접수됐어요. 운영 검토 결과가 확정된 것은 아니에요.");
       expect(reportReceipt).toHaveFocus();
     });
     expect(api.createReport).toHaveBeenCalledWith({

@@ -129,6 +129,11 @@ beforeEach(() => {
   routeId = meetup.id;
 });
 
+async function confirmLeave() {
+  fireEvent.click(await screen.findByRole("button", { name: "모임 참여 취소하기" }));
+  fireEvent.click(await screen.findByRole("button", { name: "참여 취소하기" }));
+}
+
 describe("authenticated meetup detail API", () => {
   it("links anonymous visitors to auth with a safe return to this meetup", () => {
     const api = createApi();
@@ -468,6 +473,21 @@ describe("authenticated meetup detail API", () => {
     expect(screen.queryByRole("button", { name: "이 모임에 참여하기" })).not.toBeInTheDocument();
   });
 
+  it("asks for confirmation before LEAVE and does nothing when the user keeps participating", async () => {
+    const api = createApi({
+      leaveMeetup: vi.fn().mockResolvedValue(undefined),
+      getMeetup: vi.fn().mockResolvedValue({ ...meetup, allowedActions: ["LEAVE"] }),
+    });
+    render(<AuthSessionProvider api={api}><SignedInDetail /></AuthSessionProvider>);
+
+    fireEvent.click(await screen.findByRole("button", { name: "모임 참여 취소하기" }));
+    expect(await screen.findByRole("dialog", { name: "모임 참여를 취소할까요?" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "계속 참여하기" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(api.leaveMeetup).not.toHaveBeenCalled();
+  });
+
   it("refreshes detail after a successful LEAVE without claiming an optimistic state", async () => {
     const api = createApi({
       leaveMeetup: vi.fn().mockResolvedValue(undefined),
@@ -477,7 +497,7 @@ describe("authenticated meetup detail API", () => {
     });
     render(<AuthSessionProvider api={api}><SignedInDetail /></AuthSessionProvider>);
 
-    fireEvent.click(await screen.findByRole("button", { name: "모임 참여 취소하기" }));
+    await confirmLeave();
 
     expect(await screen.findByText("참여를 취소했어요. 서버 상태를 새로 확인했어요.")).toBeInTheDocument();
     expect(api.leaveMeetup).toHaveBeenCalledWith(meetup.id, "access");
@@ -507,7 +527,7 @@ describe("authenticated meetup detail API", () => {
     fireEvent.click(await screen.findByRole("button", { name: "이 모임에 참여하기" }));
     expect(await screen.findByText("참여가 완료됐어요.")).toHaveAttribute("role", "status");
 
-    fireEvent.click(await screen.findByRole("button", { name: "모임 참여 취소하기" }));
+    await confirmLeave();
     expect(await screen.findByText("참여를 취소했어요. 서버 상태를 새로 확인했어요.")).toBeInTheDocument();
 
     fireEvent.click(await screen.findByRole("button", { name: "이 모임에 참여하기" }));
@@ -541,7 +561,7 @@ describe("authenticated meetup detail API", () => {
     });
     render(<AuthSessionProvider api={api}><SignedInDetail /></AuthSessionProvider>);
 
-    fireEvent.click(await screen.findByRole("button", { name: "모임 참여 취소하기" }));
+    await confirmLeave();
     expect(await screen.findByRole("alert")).toHaveTextContent("참여 취소를 처리하지 못했어요.");
     await waitFor(() => expect(api.getMeetup).toHaveBeenCalledTimes(2));
     fireEvent.click(screen.getByRole("button", { name: "참여 취소 다시 시도" }));
@@ -560,10 +580,15 @@ describe("authenticated meetup detail API", () => {
 
     const leave = await screen.findByRole("button", { name: "모임 참여 취소하기" });
     fireEvent.click(leave);
+    const confirm = await screen.findByRole("button", { name: "참여 취소하기" });
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
     fireEvent.click(leave);
 
     await waitFor(() => expect(api.leaveMeetup).toHaveBeenCalledTimes(1));
-    expect(screen.getByRole("button", { name: "참여 취소 처리 중…" })).toBeDisabled();
+    // The bar is reachable again once the confirmation dialog finishes closing.
+    expect(await screen.findByRole("button", { name: "참여 취소 처리 중…" })).toBeDisabled();
+    expect(api.leaveMeetup).toHaveBeenCalledTimes(1);
   });
 
   it("drops a late LEAVE completion after a route change", async () => {
@@ -583,7 +608,7 @@ describe("authenticated meetup detail API", () => {
     });
     const rendered = render(<AuthSessionProvider api={api}><SignedInDetail /></AuthSessionProvider>);
 
-    fireEvent.click(await screen.findByRole("button", { name: "모임 참여 취소하기" }));
+    await confirmLeave();
     routeId = replacement.id;
     rendered.rerender(<AuthSessionProvider api={api}><SignedInDetail /></AuthSessionProvider>);
     expect(await screen.findByRole("heading", { name: "새 경로 모임" })).toBeInTheDocument();
@@ -618,7 +643,7 @@ describe("authenticated meetup detail API", () => {
     await act(async () => {
       await latestSession.createSession({ requestId: user.id, otp: "123456" });
     });
-    fireEvent.click(await screen.findByRole("button", { name: "모임 참여 취소하기" }));
+    await confirmLeave();
     await act(async () => {
       await latestSession.createSession({ requestId: replacementUser.id, otp: "654321" });
     });
@@ -746,7 +771,7 @@ describe("authenticated meetup detail API", () => {
     await waitFor(() => expect(createReport).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByRole("button", { name: "신고 접수 중…" }));
     expect(createReport).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText("신고 내용을 이 화면에 기록했어요. 운영 검토 결과가 확정된 것은 아니에요.")).not.toBeInTheDocument();
+    expect(screen.queryByText("신고가 접수됐어요. 운영 검토 결과가 확정된 것은 아니에요.")).not.toBeInTheDocument();
 
     await act(async () => {
       firstResponse.reject(new Error("offline"));
@@ -796,7 +821,7 @@ describe("authenticated meetup detail API", () => {
         submittedAt: "2026-09-07T00:00:00Z",
       });
     });
-    expect(screen.queryByText("신고 내용을 이 화면에 기록했어요. 운영 검토 결과가 확정된 것은 아니에요.")).not.toBeInTheDocument();
+    expect(screen.queryByText("신고가 접수됐어요. 운영 검토 결과가 확정된 것은 아니에요.")).not.toBeInTheDocument();
   });
 
   it("drops a late report error after the account changes", async () => {
@@ -831,7 +856,7 @@ describe("authenticated meetup detail API", () => {
       reportResponse.reject(new Error("old account failure"));
     });
     expect(screen.queryByText("신고를 접수하지 못했어요.")).not.toBeInTheDocument();
-    expect(screen.queryByText("신고 내용을 이 화면에 기록했어요. 운영 검토 결과가 확정된 것은 아니에요.")).not.toBeInTheDocument();
+    expect(screen.queryByText("신고가 접수됐어요. 운영 검토 결과가 확정된 것은 아니에요.")).not.toBeInTheDocument();
   });
 
   it("drops a late report success after the same subject logs out and back in", async () => {
@@ -872,7 +897,7 @@ describe("authenticated meetup detail API", () => {
         submittedAt: "2026-09-07T00:00:00Z",
       });
     });
-    expect(screen.queryByText("신고 내용을 이 화면에 기록했어요. 운영 검토 결과가 확정된 것은 아니에요.")).not.toBeInTheDocument();
+    expect(screen.queryByText("신고가 접수됐어요. 운영 검토 결과가 확정된 것은 아니에요.")).not.toBeInTheDocument();
   });
 
   it("blocks an offline report submit, join, and leave without a mutation", async () => {
