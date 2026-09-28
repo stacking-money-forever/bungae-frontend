@@ -191,5 +191,5 @@ LAN-only SSH, Tailscale 미가입), 애플리케이션 배포는 내가 이어�
 - **로컬 코드 증거:** Vitest, typecheck, lint, production build, 77개 Playwright 회귀.
 - **합성 런타임 증거:** disposable HTTP upstream + 로컬 `next start`를 이용한 API proxy smoke.
 - **실제 backend 증거(2차 신규):** QA backend `https://bungae-qa.justn.me` + 실제 DB +
-  Chromium 390×844에서 익명→OTP→모임 상세 복귀, relation 기반 action 노출 확인. 09-22에는 그 스택을 제거하고 `https://bungae-api.justn.me`(rapi-agent `~/bungae-api`)로 재배포했다.
+  Chromium 390×844에서 익명→OTP→모임 상세 복귀, relation 기반 action 노출 확인. 09-22에는 그 스택을 제거하고 `https://bungae-api.justn.me`로 재배포했으며, 같은 날 호스트를 rapi-agent에서 pve VM 103(`bungae-api`, `192.168.0.10`, `~/bungae-api`)으로 이관했다(5차 참조, 구 호스트 스택은 정지·볼륨만 보존).
 - **실제 운영 증거:** commit·push·merge와 production 배포를 이번 구현에서 수행했다(PR #6·#7·#8 → main `083d224`, Vercel production `bungae-review-main-20260906.vercel.app`). 운영 데이터 변경은 하지 않았다. 배포 후 `GET /` 200, `GET /v1/meetups` → 백엔드 `401 application/problem+json`(`instance=/api/v1/meetups`)로 rewrite와 `BUNGAE_API_ORIGIN`이 production에서 동작함을 확인했다. 배포 경로는 Vercel Git 연동(`stacking-money-forever/bungae-frontend` public ↔ `bungae-review-main-20260906`, production branch `main`)으로 전환했고, 토큰 기반 `Deploy production` 워크플로는 비활성화 후 파일을 제거했다. org private repo는 Hobby 플랜에서 연동이 거부되어(`409 ... Upgrade to Pro`) 저장소를 public으로 전환했으며, 공개 전 히스토리 55개 커밋을 스캔해 키·토큰·실제 개인정보가 없음을 확인했다.
