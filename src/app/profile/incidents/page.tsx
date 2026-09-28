@@ -11,7 +11,7 @@ import { useOptionalAuthSession } from "@/lib/auth/auth-session-provider";
 import { SessionExpiredError } from "@/lib/auth/session-store";
 
 const pageSize = 20;
-function errorMessage(error: unknown, fallback: string): string { return error instanceof ApiProblemError ? error.problem?.detail ?? fallback : fallback; }
+function errorMessage(error: unknown, fallback: string): string { return error instanceof ApiProblemError ? error.problem?.detail || fallback : fallback; }
 
 export default function IncidentsPage() {
   const auth = useOptionalAuthSession();

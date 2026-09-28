@@ -36,7 +36,7 @@ type PendingUnblock = {
 type FocusIntent = "count" | "trigger" | null;
 
 function problemMessage(error: unknown, fallback: string) {
-  return error instanceof ApiProblemError ? error.problem?.detail ?? fallback : fallback;
+  return error instanceof ApiProblemError ? error.problem?.detail || fallback : fallback;
 }
 
 function createdAt(createdAt: string) {

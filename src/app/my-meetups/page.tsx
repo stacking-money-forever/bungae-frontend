@@ -11,7 +11,7 @@ import { useOptionalAuthSession } from "@/lib/auth/auth-session-provider";
 import { SessionExpiredError } from "@/lib/auth/session-store";
 
 function errorMessage(error: unknown) {
-  return error instanceof ApiProblemError ? error.problem?.detail ?? "내 모임을 불러오지 못했어요." : "내 모임을 불러오지 못했어요.";
+  return error instanceof ApiProblemError ? error.problem?.detail || "내 모임을 불러오지 못했어요." : "내 모임을 불러오지 못했어요.";
 }
 
 function displayState(state: MyMeetup["state"]) {

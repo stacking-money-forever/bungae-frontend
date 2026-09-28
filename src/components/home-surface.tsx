@@ -321,7 +321,7 @@ export function AuthenticatedHomeSurface({ filters }: { filters: HomeFilters }) 
             items: preserveItems ? previous.items : [],
             nextCursor: preserveItems ? previous.nextCursor : undefined,
             loadingMore: false,
-            error: error instanceof ApiProblemError ? error.problem?.detail ?? "모임을 불러오지 못했어요." : "모임을 불러오지 못했어요.",
+            error: error instanceof ApiProblemError ? error.problem?.detail || "모임을 불러오지 못했어요." : "모임을 불러오지 못했어요.",
           };
         });
       }

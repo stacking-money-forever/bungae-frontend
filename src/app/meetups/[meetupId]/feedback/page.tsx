@@ -44,6 +44,13 @@ const questions = [
 
 type FeedbackField = (typeof questions)[number]["id"];
 type MutationStatus = "idle" | "pending" | "error" | "conflict" | "success";
+
+// The server rejects a second post-meetup record for the same actor with this
+// code. After a lost response the retry lands here, so it means "already
+// saved", not a failure.
+function isAlreadyRecorded(error: unknown): boolean {
+  return error instanceof ApiProblemError && error.status === 409 && error.problem?.code === "DUPLICATE_POST_MEETUP_RECORD";
+}
 type FeedbackState = {
   identity: string;
   answers: Partial<Record<FeedbackField, FeedbackScore>>;
@@ -252,6 +259,10 @@ export default function FeedbackPage() {
         : { ...previous, status: "success", error: null, receipt });
     } catch (error) {
       if (request !== feedbackRequestRef.current || identityRef.current !== pageIdentity || error instanceof SessionExpiredError) return;
+      if (isAlreadyRecorded(error)) {
+        setFeedback((previous) => previous.identity !== pageIdentity ? previous : { ...previous, status: "success", error: null, receipt: null });
+        return;
+      }
       setFeedback((previous) => previous.identity !== pageIdentity
         ? previous
         : { ...previous, status: error instanceof ApiProblemError && error.status === 409 ? "conflict" : "error", error: problemMessage(error, "피드백을 제출하지 못했어요.") });
@@ -312,6 +323,10 @@ export default function FeedbackPage() {
         : { ...previous, status: "success", error: null, receipt });
     } catch (error) {
       if (request !== impressionsRequestRef.current || identityRef.current !== pageIdentity || error instanceof SessionExpiredError) return;
+      if (isAlreadyRecorded(error)) {
+        setImpressions((previous) => previous.identity !== pageIdentity ? previous : { ...previous, status: "success", error: null, receipt: null });
+        return;
+      }
       const conflict = error instanceof ApiProblemError && error.status === 409;
       setImpressions((previous) => previous.identity !== pageIdentity
         ? previous
@@ -363,6 +378,10 @@ export default function FeedbackPage() {
         : { ...previous, status: "success", error: null, receipt });
     } catch (error) {
       if (request !== nextIntentRequestRef.current || identityRef.current !== pageIdentity || error instanceof SessionExpiredError) return;
+      if (isAlreadyRecorded(error)) {
+        setNextIntent((previous) => previous.identity !== pageIdentity ? previous : { ...previous, status: "success", error: null, receipt: null });
+        return;
+      }
       const conflict = error instanceof ApiProblemError && error.status === 409;
       setNextIntent((previous) => previous.identity !== pageIdentity
         ? previous
@@ -465,8 +484,8 @@ export default function FeedbackPage() {
             {subject !== null ? <button type="submit" form="feedback-form">다시 시도</button> : null}
           </div>
         ) : null}
-        {currentFeedback.status === "success" && currentFeedback.receipt ? (
-          <p ref={feedbackReceiptRef} className="mt-4 text-[length:var(--type-body)] leading-[22px] text-[var(--fg-positive)]" role="status" aria-live="polite" tabIndex={-1}>비공개 피드백을 제출했어요. 운영팀만 확인할 수 있어요.</p>
+        {currentFeedback.status === "success" ? (
+          <p ref={feedbackReceiptRef} className="mt-4 text-[length:var(--type-body)] leading-[22px] text-[var(--fg-positive)]" role="status" aria-live="polite" tabIndex={-1}>{currentFeedback.receipt ? "비공개 피드백을 제출했어요." : "이미 제출된 피드백이에요."} 운영팀만 확인할 수 있어요.</p>
         ) : null}
 
         <section className="mt-6 border-t border-[var(--stroke-neutral)] pt-5" aria-labelledby="impressions-heading">
@@ -511,7 +530,7 @@ export default function FeedbackPage() {
           </form>
           {isImpressionsPending ? <p className="mt-3" role="status">참가자별 인상을 저장하는 중이에요.</p> : null}
           {currentImpressions.status === "error" || currentImpressions.status === "conflict" ? <div className="mt-3" role="alert"><p>{currentImpressions.error}</p>{subject !== null && impressionTargets.length > 0 ? <button type="submit" form="impressions-form">다시 시도</button> : null}</div> : null}
-          {isImpressionsSaved && currentImpressions.receipt ? <p ref={impressionsReceiptRef} className="mt-3 text-[length:var(--type-body)] leading-[22px] text-[var(--fg-positive)]" role="status" aria-live="polite" tabIndex={-1}>참가자별 인상을 저장했어요.</p> : null}
+          {isImpressionsSaved ? <p ref={impressionsReceiptRef} className="mt-3 text-[length:var(--type-body)] leading-[22px] text-[var(--fg-positive)]" role="status" aria-live="polite" tabIndex={-1}>{currentImpressions.receipt ? "참가자별 인상을 저장했어요." : "이미 저장된 인상이에요."}</p> : null}
         </section>
 
         <section className="mt-6 border-t border-[var(--stroke-neutral)] pt-5" aria-labelledby="next-intent-heading">
@@ -532,7 +551,7 @@ export default function FeedbackPage() {
           </form>
           {isNextIntentPending ? <p className="mt-3" role="status">다음 행동을 저장하는 중이에요.</p> : null}
           {currentNextIntent.status === "error" || currentNextIntent.status === "conflict" ? <div className="mt-3" role="alert"><p>{currentNextIntent.error}</p>{subject !== null ? <button type="submit" form="next-intent-form">다시 시도</button> : null}</div> : null}
-          {isNextIntentSaved && currentNextIntent.receipt ? <p ref={nextIntentReceiptRef} className="mt-3 text-[length:var(--type-body)] leading-[22px] text-[var(--fg-positive)]" role="status" aria-live="polite" tabIndex={-1}>다음 행동을 저장했어요.</p> : null}
+          {isNextIntentSaved ? <p ref={nextIntentReceiptRef} className="mt-3 text-[length:var(--type-body)] leading-[22px] text-[var(--fg-positive)]" role="status" aria-live="polite" tabIndex={-1}>{currentNextIntent.receipt ? "다음 행동을 저장했어요." : "이미 저장된 다음 행동이에요."}</p> : null}
         </section>
 
         <Link className="mt-6 flex min-h-[56px] items-center justify-between border-y border-[var(--stroke-neutral)] py-3 text-[15px] font-semibold leading-6 text-[var(--fg-critical)] focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2" href={safetyHref}>

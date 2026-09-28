@@ -14,7 +14,7 @@ import { chromeButtonClassName } from "@/lib/ui/connection-copy";
 type Connection = ConnectionPage["items"][number];
 
 function message(cause: unknown, fallback: string) {
-  return cause instanceof ApiProblemError ? cause.problem?.detail ?? fallback : fallback;
+  return cause instanceof ApiProblemError ? cause.problem?.detail || fallback : fallback;
 }
 
 export default function ConnectionsPage() {

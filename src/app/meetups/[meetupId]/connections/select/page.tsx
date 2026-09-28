@@ -20,7 +20,7 @@ import {
 type LoadState = "loading" | "ready" | "error";
 
 function message(cause: unknown, fallback: string) {
-  return cause instanceof ApiProblemError ? cause.problem?.detail ?? fallback : fallback;
+  return cause instanceof ApiProblemError ? cause.problem?.detail || fallback : fallback;
 }
 
 export default function ConnectionSelectPage() {
