@@ -52,6 +52,14 @@ const SECURITY_HEADERS = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self)" },
+  { key: "Strict-Transport-Security", value: "max-age=63072000" },
+  // Structural directives only. script/style/connect sources need per-request
+  // nonces for Next.js inline bootstrap scripts, which this app does not set up
+  // yet, so they are intentionally left unrestricted here.
+  {
+    key: "Content-Security-Policy",
+    value: "base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'",
+  },
 ];
 
 const nextConfig: NextConfig = {
