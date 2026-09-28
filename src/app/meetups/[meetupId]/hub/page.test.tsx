@@ -32,7 +32,7 @@ describe("MeetupHubPage", () => {
     render(<MeetupHubPage />);
 
     expect(screen.getByRole("heading", { name: "로그인하고 모임 상태를 확인해 주세요" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "휴대전화로 로그인하기" })).toHaveAttribute("href", "/auth");
+    expect(screen.getByRole("link", { name: "휴대전화로 로그인하기" })).toHaveAttribute("href", "/auth?next=%2Fmeetups%2Fdemo%2Fhub");
     expect(screen.queryByText("망원한강공원 3번 출입구")).not.toBeInTheDocument();
   });
 

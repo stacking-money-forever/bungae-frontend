@@ -260,10 +260,19 @@ describe("FeedbackPage", () => {
     expect(screen.queryByText("다음 행동을 저장했어요.")).not.toBeInTheDocument();
   });
 
-  it("shows retryable generic and 409 impressions failures without a success claim", async () => {
+  it("shows retryable generic and ineligible 409 impressions failures without a success claim", async () => {
+    const ineligible = new ApiProblemError(409, {
+      type: "https://bungae.example/problems/post-meetup",
+      title: "Post meetup rejected",
+      status: 409,
+      detail: "체크인한 참가자만 남길 수 있어요.",
+      instance: "/v1/meetups/demo/impressions",
+      code: "POST_MEETUP_INELIGIBLE",
+      traceId: "trace-1",
+    });
     const createImpressions = vi.fn()
       .mockRejectedValueOnce(new Error("offline"))
-      .mockRejectedValueOnce(postMeetupProblem(409, "이미 저장된 인상이에요."))
+      .mockRejectedValueOnce(ineligible)
       .mockResolvedValueOnce(receipt);
     const api = createApi({ listParticipants: vi.fn().mockResolvedValue({ items: [checkedIn("target", "서윤")] }), createImpressions });
     renderAuthenticated(api);
@@ -272,12 +281,36 @@ describe("FeedbackPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "인상 저장하기" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("인상을 저장하지 못했어요. 다시 시도해 주세요.");
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("이미 저장된 인상이에요.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("체크인한 참가자만 남길 수 있어요.");
     expect(screen.queryByText("참가자별 인상을 저장했어요.")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
     await waitFor(() => expect(createImpressions).toHaveBeenCalledTimes(3));
     expect(createImpressions.mock.calls[1]).toEqual(createImpressions.mock.calls[0]);
     expect(await screen.findByText("참가자별 인상을 저장했어요.")).toBeInTheDocument();
+  });
+
+  it("treats a duplicate-record 409 after a lost response as already saved", async () => {
+    const createFeedback = vi.fn().mockRejectedValueOnce(new Error("offline")).mockRejectedValueOnce(postMeetupProblem(409, "This response already exists."));
+    const createImpressions = vi.fn().mockRejectedValueOnce(postMeetupProblem(409, "This response already exists."));
+    const createNextIntent = vi.fn().mockRejectedValueOnce(postMeetupProblem(409, "This response already exists."));
+    const api = createApi({ listParticipants: vi.fn().mockResolvedValue({ items: [checkedIn("target", "서윤")] }), createFeedback, createImpressions, createNextIntent });
+    renderAuthenticated(api);
+
+    await fillScores();
+    fireEvent.click(screen.getByRole("button", { name: "비공개로 제출하기" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("피드백을 제출하지 못했어요.");
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(await screen.findByText("이미 제출된 피드백이에요. 운영팀만 확인할 수 있어요.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "피드백 제출됨" })).toBeDisabled();
+
+    await selectImpression();
+    fireEvent.click(screen.getByRole("button", { name: "인상 저장하기" }));
+    expect(await screen.findByText("이미 저장된 인상이에요.")).toHaveAttribute("role", "status");
+
+    fireEvent.click(screen.getByRole("radio", { name: "같은 활동을 새로운 사람들과 하기" }));
+    fireEvent.click(screen.getByRole("button", { name: "다음 행동 저장하기" }));
+    expect(await screen.findByText("이미 저장된 다음 행동이에요.")).toHaveAttribute("role", "status");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("validates next intent then sends the exact supported value after a 201 receipt", async () => {

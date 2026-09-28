@@ -127,26 +127,71 @@ self.addEventListener("fetch", (event) => {
   }
 });
 
+function firstString(...values) {
+  for (const value of values) {
+    if (typeof value === "string" && value.length > 0) return value;
+  }
+  return undefined;
+}
+
+function asObject(value) {
+  return value && typeof value === "object" ? value : {};
+}
+
+// Accepts both the FCM web push envelope ({ notification, data, fcmOptions })
+// and a flat { title, body, url, tag } payload.
+function notificationFromPayload(payload) {
+  const notification = asObject(payload.notification);
+  const data = asObject(payload.data);
+  const fcmOptions = asObject(payload.fcmOptions);
+  return {
+    title: firstString(notification.title, data.title, payload.title) ?? "벙개",
+    body: firstString(notification.body, data.body, payload.body) ?? "",
+    tag: firstString(notification.tag, data.tag, payload.tag),
+    url: safeInternalPath(firstString(data.url, fcmOptions.link, payload.url)),
+  };
+}
+
 self.addEventListener("push", (event) => {
   let payload = {};
   try {
-    payload = event.data ? event.data.json() : {};
+    payload = asObject(event.data ? event.data.json() : {});
   } catch {
     payload = { body: event.data ? event.data.text() : "" };
   }
-  const title = typeof payload.title === "string" ? payload.title : "벙개";
-  const body = typeof payload.body === "string" ? payload.body : "";
+  const { title, body, tag, url } = notificationFromPayload(payload);
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
-      tag: typeof payload.tag === "string" ? payload.tag : undefined,
-      data: { url: safeInternalPath(payload.url) },
+      tag,
+      data: { url },
       icon: "/icons/icon-192.png",
       badge: "/icons/icon-maskable-192.png",
     }),
   );
 });
 
+const NAVIGATE_ACK_TIMEOUT_MS = 1500;
+
+// Asks an open window to route client-side and resolves true once it
+// acknowledges. A window running an older bundle, an error screen, or a page
+// that has not hydrated never answers.
+function requestClientNavigation(client, url) {
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    const timer = setTimeout(() => resolve(false), NAVIGATE_ACK_TIMEOUT_MS);
+    channel.port1.onmessage = () => {
+      clearTimeout(timer);
+      resolve(true);
+    };
+    client.postMessage({ type: "NAVIGATE", url }, [channel.port2]);
+  });
+}
+
+// An open app window is asked to route client-side (NAVIGATE message) instead
+// of being reloaded: the session lives only in page memory, so a document
+// navigation would sign the user out. Only when the window does not answer is
+// it navigated as a document, so the destination is never lost.
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const target = safeInternalPath(event.notification.data?.url);
@@ -154,9 +199,11 @@ self.addEventListener("notificationclick", (event) => {
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
         if (new URL(client.url).origin === self.location.origin && "focus" in client) {
-          return client.focus().then(() =>
-            "navigate" in client ? client.navigate(target) : undefined,
-          );
+          return client.focus().then(async (focused) => {
+            const windowClient = focused ?? client;
+            if (await requestClientNavigation(windowClient, target)) return undefined;
+            return "navigate" in windowClient ? windowClient.navigate(target) : self.clients.openWindow(target);
+          });
         }
       }
       return self.clients.openWindow(target);

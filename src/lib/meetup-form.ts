@@ -1,4 +1,3 @@
-import { PUBLIC_PLACES, type PublicPlace } from "@/components/place-picker";
 import type { TimeWheelOption } from "@/components/time-wheel-picker";
 
 export interface CreateFormValues {
@@ -7,7 +6,6 @@ export interface CreateFormValues {
   purpose: string;
   start: string;
   end: string;
-  place: PublicPlace | null;
   minimum: string;
   capacity: string;
   costAlcohol: string;
@@ -62,7 +60,6 @@ export const initialValues: CreateFormValues = {
   purpose: "20분 산책 후 카페에서 이야기 나눠요",
   start: "offset-150",
   end: "offset-240",
-  place: PUBLIC_PLACES[0] ?? null,
   minimum: "3",
   capacity: "6",
   costAlcohol: "무료 · 음주 없음",
@@ -78,7 +75,13 @@ export function createInitialValues(options: TimeWheelOption[]): CreateFormValue
   };
 }
 
-export function validateMeetupForm(values: CreateFormValues): CreateFormErrors {
+/** Server venue state: a provider search result and the public-place confirmation. */
+export interface MeetupPlaceSelection {
+  selected: boolean;
+  publicConfirmed: boolean;
+}
+
+export function validateMeetupForm(values: CreateFormValues, place: MeetupPlaceSelection): CreateFormErrors {
   const errors: CreateFormErrors = {};
   const start = getOffsetMinutes(values.start);
   const end = getOffsetMinutes(values.end);
@@ -92,8 +95,10 @@ export function validateMeetupForm(values: CreateFormValues): CreateFormErrors {
   if (end === null || (start !== null && end <= start)) {
     errors.end = "종료 시간은 시작 시간보다 늦어야 해요.";
   }
-  if (!values.place || values.place.isPublic !== true) {
-    errors.place = "누구나 접근할 수 있는 공개 장소를 선택해 주세요.";
+  if (!place.selected) {
+    errors.place = "서버 장소 검색에서 모임 장소를 선택해 주세요.";
+  } else if (!place.publicConfirmed) {
+    errors.place = "누구나 접근할 수 있는 공개 장소인지 확인해 주세요.";
   }
   if (!Number.isInteger(minimum) || minimum < 2) {
     errors.minimum = "최소 성사 인원은 2명 이상이어야 해요.";

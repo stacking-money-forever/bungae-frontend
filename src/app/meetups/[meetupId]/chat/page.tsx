@@ -12,7 +12,7 @@ import { OfflineNotice } from "@/components/offline-notice";
 import { ScreenShell } from "@/components/screen-shell";
 import { TopNavigation } from "@/components/top-navigation";
 import { ApiProblemError } from "@/lib/api/client";
-import type { MessagePage } from "@/lib/api/types";
+import type { Message, MessagePage } from "@/lib/api/types";
 import { useOptionalAuthSession } from "@/lib/auth/auth-session-provider";
 import { SessionExpiredError } from "@/lib/auth/session-store";
 import { identityKey } from "@/lib/ui/async-state";
@@ -28,7 +28,7 @@ import { useOnlineStatus } from "@/lib/ui/online";
  */
 
 function problemMessage(error: unknown, fallback: string) {
-  return error instanceof ApiProblemError ? error.problem?.detail ?? fallback : fallback;
+  return error instanceof ApiProblemError ? error.problem?.detail || fallback : fallback;
 }
 
 export default function MeetupChatPage() {
@@ -53,7 +53,14 @@ export default function MeetupChatPage() {
   const guideRef = useRef<HTMLElement>(null);
   const listSectionRef = useRef<HTMLElement>(null);
   const atBottomRef = useRef(true);
+  // List loads and sends are tracked separately: a refresh or older-page load
+  // must not orphan an in-flight send (and vice versa), or the composer and
+  // list controls stay disabled forever. Identity changes bump both.
   const requestRef = useRef(0);
+  const sendRequestRef = useRef(0);
+  // Messages acknowledged after the latest full reload started. That reload's
+  // page may predate them, so they are merged back once it lands.
+  const acknowledgedDuringLoadRef = useRef<Message[]>([]);
   const draftKeyRef = useRef<{ text: string; key: string } | null>(null);
   const sendInFlightRef = useRef(false);
   const lastAcknowledgedIdRef = useRef<string | null>(null);
@@ -79,6 +86,9 @@ export default function MeetupChatPage() {
     const request = ++requestRef.current;
     const requestSession = sessionKeyRef.current;
     if (!append) {
+      // A full reload supersedes any older-page load still in flight.
+      setAppending(false);
+      acknowledgedDuringLoadRef.current = [];
       dispatch({ type: "history-loading" });
     } else {
       setAppending(true);
@@ -87,6 +97,9 @@ export default function MeetupChatPage() {
       const page: MessagePage = await auth.listMeetupMessages(meetupId, { cursor, limit: 20 });
       if (request !== requestRef.current || sessionKeyRef.current !== requestSession) return;
       dispatch({ type: "history-ready", page, append, dedupe: true });
+      if (!append) {
+        for (const message of acknowledgedDuringLoadRef.current) dispatch({ type: "send-acknowledged", message });
+      }
     } catch (error) {
       if (request !== requestRef.current || sessionKeyRef.current !== requestSession || error instanceof SessionExpiredError) return;
       const message = problemMessage(error, append ? "이전 메시지를 불러오지 못했어요." : "메시지를 불러오지 못했어요.");
@@ -100,8 +113,10 @@ export default function MeetupChatPage() {
   // state, draft, keys, anchors, and load the fresh history.
   useEffect(() => {
     requestRef.current += 1;
+    sendRequestRef.current += 1;
     draftKeyRef.current = null;
     sendInFlightRef.current = false;
+    acknowledgedDuringLoadRef.current = [];
     lastAcknowledgedIdRef.current = null;
     setDraft("");
     setAppending(false);
@@ -117,6 +132,7 @@ export default function MeetupChatPage() {
     void load();
     return () => {
       requestRef.current += 1;
+      sendRequestRef.current += 1;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewKey, subject]);
@@ -149,7 +165,7 @@ export default function MeetupChatPage() {
     const trimmed = text.trim();
     if (!auth || !subject || !meetupId || trimmed.length < 1 || trimmed.length > 2000) return;
     if (sendInFlightRef.current) return;
-    const request = ++requestRef.current;
+    const request = ++sendRequestRef.current;
     const requestSession = sessionKeyRef.current;
     const previousKey = draftKeyRef.current;
     const key = previousKey?.text === trimmed ? previousKey.key : crypto.randomUUID();
@@ -158,16 +174,17 @@ export default function MeetupChatPage() {
     dispatch({ type: "send-submitting" });
     try {
       const created = await auth.createMeetupMessage(meetupId, trimmed, key);
-      if (request !== requestRef.current || sessionKeyRef.current !== requestSession) return;
+      if (request !== sendRequestRef.current || sessionKeyRef.current !== requestSession) return;
       lastAcknowledgedIdRef.current = created.id;
+      acknowledgedDuringLoadRef.current.push(created);
       dispatch({ type: "send-acknowledged", message: created });
       setDraft("");
       draftKeyRef.current = null;
     } catch (error) {
-      if (request !== requestRef.current || sessionKeyRef.current !== requestSession || error instanceof SessionExpiredError) return;
+      if (request !== sendRequestRef.current || sessionKeyRef.current !== requestSession || error instanceof SessionExpiredError) return;
       dispatch({ type: "send-failed", message: problemMessage(error, "메시지를 보내지 못했어요.") });
     } finally {
-      if (request === requestRef.current) sendInFlightRef.current = false;
+      if (request === sendRequestRef.current) sendInFlightRef.current = false;
     }
   }, [auth, dispatch, meetupId, subject]);
 

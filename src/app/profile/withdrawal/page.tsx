@@ -24,7 +24,7 @@ type PendingAction = "none" | "schedule" | "cancel";
 type ScheduleKey = { identity: string; value: string } | null;
 
 function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof ApiProblemError ? error.problem?.detail ?? fallback : fallback;
+  return error instanceof ApiProblemError ? error.problem?.detail || fallback : fallback;
 }
 
 export default function WithdrawalPage() {

@@ -118,11 +118,12 @@ function isSafeProviderUrl(value: string): boolean {
 }
 
 function message(error: unknown, fallback: string): string {
-  return error instanceof ApiProblemError ? error.problem?.detail ?? fallback : fallback;
+  return error instanceof ApiProblemError ? error.problem?.detail || fallback : fallback;
 }
 
 export default function ProfilePage() {
-  const { logout, snapshot, getMe, updateMe, getActivityPolicies, createVerificationSession, sessionEpoch } = useAuthSession();
+  const { logout, snapshot, getMe, updateMe, getActivityPolicies, createVerificationSession, sessionEpoch, restoring, restoreFailed, handoffForNavigation } = useAuthSession();
+  const [handoffUnavailable, setHandoffUnavailable] = useState(false);
   const subject = snapshot.status === "authenticated" ? snapshot.user.id : null;
   // Session-scoped identity: the same subject logging in again after logout is
   // a distinct session, so late completions from the old login cannot commit.
@@ -225,6 +226,15 @@ export default function ProfilePage() {
     };
   }, [loadPolicies, loadProfile, sessionKey, subject]);
 
+  if (!subject && restoring) {
+    return (
+      <ScreenShell className="px-5 pb-8" aria-label="로그인 확인 중">
+        <TopNavigation href="/" title={<span className="font-display text-[16px] font-normal leading-6">프로필</span>} className="-mx-5 px-4" />
+        <p className="mt-12 text-[14px] leading-5 text-[var(--fg-muted)]" role="status">로그인 상태를 확인하고 있어요.</p>
+      </ScreenShell>
+    );
+  }
+
   if (!subject) {
     return (
       <ScreenShell className="px-5 pb-8" aria-label="로그인 필요">
@@ -236,7 +246,12 @@ export default function ProfilePage() {
           <p className="m-0 mt-4 text-[14px] leading-[22px] text-[var(--fg-muted)]">
             프로필 정보와 설정은 로그인한 계정의 서버 정보에서만 표시해요.
           </p>
-          <Link className="mt-6 inline-flex min-h-[44px] items-center justify-center rounded-[12px] bg-[var(--brand-accent)] px-4 text-[14px] font-bold text-[var(--fg-on-brand)]" href="/auth">
+          {restoreFailed ? (
+            <p className="m-0 mt-4 text-[14px] leading-[22px] text-[var(--fg-neutral)]" role="alert">
+              인증 후 로그인 상태를 이어 가지 못했어요. 다시 로그인한 뒤 인증 결과를 확인해 주세요.
+            </p>
+          ) : null}
+          <Link className="mt-6 inline-flex min-h-[44px] items-center justify-center rounded-[12px] bg-[var(--brand-accent)] px-4 text-[14px] font-bold text-[var(--fg-on-brand)]" href="/auth?next=%2Fprofile">
             휴대전화로 로그인하기
           </Link>
         </section>
@@ -397,7 +412,16 @@ export default function ProfilePage() {
             {currentProfile.adultVerified && currentProfile.identityVerified ? <p className="m-0 text-[14px] leading-5 text-[var(--fg-neutral)]" role="status">성인 및 본인 인증이 완료되었어요.</p> : <>
               <p className="m-0 text-[14px] leading-5 text-[var(--fg-neutral)]">안전한 모임을 위해 성인·본인 인증이 필요해요. 인증을 나중에 해도 탐색은 가능하지만, 모임 생성과 참여는 제한돼요.</p>
               <ul className="m-0 grid gap-1 pl-5 text-[13px] leading-5 text-[var(--fg-muted)]"><li>예상 소요 시간은 인증 제공자 화면에서 안내해요.</li><li>신분증 원본은 저장하지 않아요. 인증 결과와 제공자 참조값만 저장해요.</li><li>실명은 다른 사용자에게 공개하지 않아요.</li></ul>
-              {currentVerification.state === "ready" && currentVerification.url ? <div className="grid gap-2" role="status"><p className="m-0 text-[14px] leading-5 text-[var(--fg-neutral)]">인증 제공자 화면을 열 준비가 됐어요.{currentVerification.expiresAt ? ` ${new Date(currentVerification.expiresAt).toLocaleString("ko-KR")}까지 유효해요.` : ""}</p><button type="button" onClick={() => { if (currentVerification.url && isSafeProviderUrl(currentVerification.url)) window.location.assign(currentVerification.url); }} className="min-h-[44px] bg-[var(--brand-accent)] px-3 text-[14px] font-bold text-[var(--fg-on-brand)]">인증 제공자에서 계속하기</button></div> : null}
+              {currentVerification.state === "ready" && currentVerification.url ? <div className="grid gap-2" role="status"><p className="m-0 text-[14px] leading-5 text-[var(--fg-neutral)]">인증 제공자 화면을 열 준비가 됐어요.{currentVerification.expiresAt ? ` ${new Date(currentVerification.expiresAt).toLocaleString("ko-KR")}까지 유효해요.` : ""}</p><button type="button" onClick={() => {
+                if (!currentVerification.url || !isSafeProviderUrl(currentVerification.url)) return;
+                // A failed handoff means the user returns signed out. Warn once;
+                // the second tap continues knowingly.
+                if (!handoffForNavigation() && !handoffUnavailable) {
+                  setHandoffUnavailable(true);
+                  return;
+                }
+                window.location.assign(currentVerification.url);
+              }} className="min-h-[44px] bg-[var(--brand-accent)] px-3 text-[14px] font-bold text-[var(--fg-on-brand)]">인증 제공자에서 계속하기</button>{handoffUnavailable ? <p className="m-0 text-[13px] leading-5 text-[var(--fg-neutral)]" role="alert">이 브라우저에서는 인증 후 로그인 상태를 이어 갈 수 없어요. 계속하면 인증을 마친 뒤 다시 로그인해야 해요.</p> : null}</div> : null}
               {currentVerification.state === "error" ? <p className="m-0 text-[14px] leading-5 text-[var(--fg-neutral)]" role="alert">{currentVerification.error}</p> : null}
               <button type="button" disabled={currentVerification.state === "requesting" || !online} onClick={() => void startVerification()} className="min-h-[44px] bg-[var(--brand-accent)] px-3 text-[14px] font-bold text-[var(--fg-on-brand)] disabled:opacity-60">{currentVerification.state === "requesting" ? "인증 준비 중" : currentVerification.state === "error" ? "인증 다시 시도" : "인증 시작"}</button>
               <p className="m-0 text-[12px] leading-5 text-[var(--fg-muted)]">문제가 계속되면 고객 지원으로 문의해 주세요.</p>

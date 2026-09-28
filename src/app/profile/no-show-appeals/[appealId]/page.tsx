@@ -11,7 +11,7 @@ import type { NoShowAppeal } from "@/lib/api/types";
 import { useOptionalAuthSession } from "@/lib/auth/auth-session-provider";
 import { SessionExpiredError } from "@/lib/auth/session-store";
 
-function errorMessage(error: unknown): string { return error instanceof ApiProblemError ? error.problem?.detail ?? "이의 상세를 불러오지 못했어요. 다시 시도해 주세요." : "이의 상세를 불러오지 못했어요. 다시 시도해 주세요."; }
+function errorMessage(error: unknown): string { return error instanceof ApiProblemError ? error.problem?.detail || "이의 상세를 불러오지 못했어요. 다시 시도해 주세요." : "이의 상세를 불러오지 못했어요. 다시 시도해 주세요."; }
 
 export default function NoShowAppealDetailPage() {
   const { appealId = "" } = useParams<{ appealId: string }>();

@@ -17,7 +17,7 @@ import { SessionExpiredError } from "@/lib/auth/session-store";
 import { useOnlineStatus } from "@/lib/ui/online";
 
 function errorMessage(error: unknown) {
-  return error instanceof ApiProblemError ? error.problem?.detail ?? "체크인을 처리하지 못했어요. 다시 시도해 주세요." : "체크인을 처리하지 못했어요. 다시 시도해 주세요.";
+  return error instanceof ApiProblemError ? error.problem?.detail || "체크인을 처리하지 못했어요. 다시 시도해 주세요." : "체크인을 처리하지 못했어요. 다시 시도해 주세요.";
 }
 
 export default function CheckInPage() {

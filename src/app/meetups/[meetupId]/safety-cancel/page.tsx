@@ -16,7 +16,7 @@ import { SessionExpiredError } from "@/lib/auth/session-store";
 import { useOnlineStatus } from "@/lib/ui/online";
 
 function errorMessage(error: unknown, fallback: string) {
-  return error instanceof ApiProblemError ? error.problem?.detail ?? fallback : fallback;
+  return error instanceof ApiProblemError ? error.problem?.detail || fallback : fallback;
 }
 
 export default function SafetyCancelPage() {

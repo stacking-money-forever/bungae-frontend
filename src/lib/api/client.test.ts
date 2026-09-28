@@ -498,4 +498,43 @@ describe("Bungae API client", () => {
       } satisfies Partial<ApiProblemError>),
     );
   });
+
+  it("keeps a partial problem's code and fills missing members instead of dropping it", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ title: "OTP is invalid", code: "OTP_INVALID", errors: [{ field: "otp" }] }), {
+        status: 401,
+        headers: { "content-type": "application/problem+json" },
+      }),
+    );
+    const api = createBungaeApi({ fetchImpl: fetchMock as unknown as typeof fetch });
+
+    await expect(api.createSession({ requestId: user.id, otp: "123456" })).rejects.toEqual(
+      expect.objectContaining({
+        status: 401,
+        problem: {
+          type: "about:blank",
+          title: "OTP is invalid",
+          status: 401,
+          detail: "",
+          instance: "",
+          code: "OTP_INVALID",
+          traceId: "",
+        },
+      }),
+    );
+  });
+
+  it("ignores a problem body without a code or title", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ detail: 42 }), {
+        status: 500,
+        headers: { "content-type": "application/problem+json" },
+      }),
+    );
+    const api = createBungaeApi({ fetchImpl: fetchMock as unknown as typeof fetch });
+
+    await expect(api.createSession({ requestId: user.id, otp: "123456" })).rejects.toEqual(
+      expect.objectContaining({ status: 500, problem: null }),
+    );
+  });
 });

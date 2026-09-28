@@ -144,7 +144,7 @@ function parseCostAndAlcohol(value: string): Pick<MeetupCreate, "cost" | "alcoho
 
 function problemMessage(error: unknown) {
   if (error instanceof ApiProblemError) {
-    return error.problem?.detail ?? `요청을 처리하지 못했어요. (${error.status})`;
+    return error.problem?.detail || `요청을 처리하지 못했어요. (${error.status})`;
   }
   return "네트워크 상태를 확인한 뒤 다시 시도해 주세요.";
 }
@@ -202,7 +202,7 @@ function NewMeetupPageContent() {
           </p>
         </section>
         <BottomActionBar>
-          <Link className="inline-flex min-h-[var(--action-primary-height)] w-full items-center justify-center rounded-[12px] bg-[var(--brand-accent)] px-4 text-[length:var(--type-action)] font-bold leading-6 text-[var(--fg-on-brand)]" href="/auth">
+          <Link className="inline-flex min-h-[var(--action-primary-height)] w-full items-center justify-center rounded-[12px] bg-[var(--brand-accent)] px-4 text-[length:var(--type-action)] font-bold leading-6 text-[var(--fg-on-brand)]" href="/auth?next=%2Fmeetups%2Fnew">
             휴대전화로 로그인하기
           </Link>
         </BottomActionBar>
@@ -255,18 +255,18 @@ function NewMeetupPageContent() {
     if (id === "start" || id === "end") clearErrors("start", "end");
     else if (id === "minimum" || id === "capacity") clearErrors("minimum", "capacity");
     else if (id === "title") clearErrors("title");
-    else if (id === "place") clearErrors("place");
     else if (id === "facilitationTemplate" || id === "costAlcohol") clearErrors(id);
   };
 
   const postMeetup = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const nextErrors = validateMeetupForm(values);
+    const nextErrors = validateMeetupForm(values, { selected: Boolean(providerPlace), publicConfirmed: publicPlaceConfirmed });
     const firstError = Object.keys(nextErrors)[0] as keyof CreateFormErrors | undefined;
     if (firstError) {
       setErrors(nextErrors);
+      const placeTarget = providerPlace ? "public-place-confirm" : "provider-place-query";
       window.requestAnimationFrame(() => document.getElementById(
-        firstError === "start" || firstError === "end" ? `${firstError}-trigger` : firstError === "place" ? "place-trigger" : firstError,
+        firstError === "start" || firstError === "end" ? `${firstError}-trigger` : firstError === "place" ? placeTarget : firstError,
       )?.focus());
       return;
     }
@@ -282,10 +282,19 @@ function NewMeetupPageContent() {
     const costAndAlcohol = parseCostAndAlcohol(values.costAlcohol);
     const start = timeOptions.find((option) => option.value === values.start);
     const end = timeOptions.find((option) => option.value === values.end);
-    if (!activityCode || !costAndAlcohol || !start?.instant || !end?.instant || !providerPlace || !publicPlaceConfirmed) {
-      setMutationProblem(!activityCode ? "선택한 활동은 현재 서버 생성 정책에서 지원하지 않아요." : "비용은 ‘무료’ 또는 ‘숫자원’ 형식으로 입력해 주세요.");
+    if (!activityCode) {
+      setMutationProblem("선택한 활동은 현재 서버 생성 정책에서 지원하지 않아요.");
       return;
     }
+    if (!costAndAlcohol) {
+      setMutationProblem("비용은 ‘무료’ 또는 ‘숫자원’ 형식으로 입력해 주세요.");
+      return;
+    }
+    if (!start?.instant || !end?.instant) {
+      setMutationProblem("선택한 시간이 만료됐어요. 시간을 다시 선택해 주세요.");
+      return;
+    }
+    if (!providerPlace || !publicPlaceConfirmed) return;
     const now = Date.now();
     const startsAt = Date.parse(start.instant);
     const endsAt = Date.parse(end.instant);
@@ -417,18 +426,19 @@ function NewMeetupPageContent() {
           </fieldset>
 
           <section aria-label="서버 장소 검색" className="space-y-2">
-            <TextField id="provider-place-query" label="장소 검색" value={placeQuery} placeholder="장소명 또는 주소" onChange={(value) => { placeSearchGenerationRef.current += 1; setPlaceQuery(value); setProviderPlace(null); setPublicPlaceConfirmed(false); setPlaceResults([]); setPlaceSearchProblem(null); setIsSearchingPlaces(false); }} />
+            <TextField id="provider-place-query" label="장소 검색" value={placeQuery} placeholder="장소명 또는 주소" error={providerPlace ? undefined : errors.place} onChange={(value) => { placeSearchGenerationRef.current += 1; clearErrors("place"); setPlaceQuery(value); setProviderPlace(null); setPublicPlaceConfirmed(false); setPlaceResults([]); setPlaceSearchProblem(null); setIsSearchingPlaces(false); }} />
             <button type="button" onClick={searchProviderPlaces} disabled={isSearchingPlaces || !placeQuery.trim() || !online} className="min-h-10 rounded-[12px] border border-[var(--stroke-neutral)] px-3 text-[14px] font-semibold disabled:opacity-50">
               {isSearchingPlaces ? "장소 검색 중…" : "서버 장소 검색"}
             </button>
             {placeSearchProblem ? <StatusBanner tone="critical" label="장소를 선택하지 못했어요." description={placeSearchProblem} /> : null}
             {placeResults.length > 0 ? <div role="radiogroup" aria-label="서버 장소 검색 결과">{placeResults.map((place) => (
               <label key={place.providerPlaceId} className="flex gap-2 border-b border-[var(--stroke-neutral)] py-2">
-                <input type="radio" name="provider-place" checked={providerPlace?.providerPlaceId === place.providerPlaceId} onChange={() => { setProviderPlace(place); setPublicPlaceConfirmed(false); }} />
+                <input type="radio" name="provider-place" checked={providerPlace?.providerPlaceId === place.providerPlaceId} onChange={() => { clearErrors("place"); setProviderPlace(place); setPublicPlaceConfirmed(false); }} />
                 <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]"><strong>{place.name}</strong><br />{place.category} · {place.roadAddress || place.address}</span>
               </label>
             ))}</div> : null}
-            {providerPlace ? <><StatusBanner tone="positive" label={providerPlace.name} description={`${providerPlace.category} · ${providerPlace.roadAddress || providerPlace.address}`} /><label className="flex gap-2 text-[13px]"><input type="checkbox" checked={publicPlaceConfirmed} onChange={(event) => setPublicPlaceConfirmed(event.target.checked)} />누구나 접근할 수 있는 공개 장소임을 확인했어요.</label></> : null}
+            {providerPlace ? <><StatusBanner tone="positive" label={providerPlace.name} description={`${providerPlace.category} · ${providerPlace.roadAddress || providerPlace.address}`} /><label className="flex gap-2 text-[13px]"><input id="public-place-confirm" type="checkbox" checked={publicPlaceConfirmed} aria-describedby={errors.place ? "place-error" : undefined} onChange={(event) => { clearErrors("place"); setPublicPlaceConfirmed(event.target.checked); }} />누구나 접근할 수 있는 공개 장소임을 확인했어요.</label></> : null}
+            {errors.place && providerPlace ? <p id="place-error" className="m-0 text-[12px] leading-4 text-[var(--fg-critical)]">{errors.place}</p> : null}
           </section>
           <fieldset className="m-0 border-0 p-0">
             <legend className="mb-2 text-[13px] font-semibold leading-5 text-[var(--fg-neutral)]">몇 명이 모이면 시작할까요?</legend>

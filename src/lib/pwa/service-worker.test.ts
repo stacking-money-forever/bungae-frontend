@@ -189,4 +189,83 @@ describe("service worker", () => {
     expect(close).toHaveBeenCalledOnce();
     expect(clients.openWindow).toHaveBeenCalledWith("/");
   });
+
+  it("shows the FCM notification envelope title, body, and data url", async () => {
+    const { worker } = loadWorker();
+    loadWorkerScript();
+
+    const waitUntil = vi.fn();
+    await dispatch("push", {
+      data: { json: () => ({ notification: { title: "모임이 확정됐어요", body: "오늘 7시 합정" }, data: { url: "/meetups/m-1" }, fcmMessageId: "x" }) },
+      waitUntil,
+    });
+
+    expect(worker.registration.showNotification).toHaveBeenCalledWith("모임이 확정됐어요", expect.objectContaining({ body: "오늘 7시 합정", data: { url: "/meetups/m-1" } }));
+  });
+
+  it("keeps accepting a flat push payload and rejects a cross-origin fcmOptions link", async () => {
+    const { worker } = loadWorker();
+    loadWorkerScript();
+
+    const waitUntil = vi.fn();
+    await dispatch("push", {
+      data: { json: () => ({ title: "알림", body: "본문", tag: "t", fcmOptions: { link: "https://attacker.example/" } }) },
+      waitUntil,
+    });
+
+    expect(worker.registration.showNotification).toHaveBeenCalledWith("알림", expect.objectContaining({ body: "본문", tag: "t", data: { url: "/" } }));
+  });
+
+  it("asks an open app window to route client-side instead of reloading it", async () => {
+    const { clients } = loadWorker();
+    const client = {
+      url: "https://bungae.example/my-meetups",
+      focus: vi.fn(),
+      navigate: vi.fn(),
+      postMessage: vi.fn((_message: unknown, ports: MessagePort[]) => ports[0].postMessage({ type: "NAVIGATED" })),
+    };
+    client.focus.mockResolvedValue(client);
+    clients.matchAll.mockResolvedValue([client]);
+    loadWorkerScript();
+
+    const waitUntil = vi.fn();
+    await dispatch("notificationclick", {
+      notification: { close: vi.fn(), data: { url: "/meetups/m-1/chat" } },
+      waitUntil,
+    });
+
+    expect(client.focus).toHaveBeenCalledOnce();
+    expect(client.postMessage).toHaveBeenCalledWith({ type: "NAVIGATE", url: "/meetups/m-1/chat" }, [expect.any(MessagePort)]);
+    expect(client.navigate).not.toHaveBeenCalled();
+    expect(clients.openWindow).not.toHaveBeenCalled();
+  });
+
+  it("navigates the window as a document when it does not acknowledge the route", async () => {
+    vi.useFakeTimers();
+    try {
+      const { clients } = loadWorker();
+      const client = {
+        url: "https://bungae.example/",
+        focus: vi.fn(),
+        navigate: vi.fn().mockResolvedValue(undefined),
+        postMessage: vi.fn(),
+      };
+      client.focus.mockResolvedValue(client);
+      clients.matchAll.mockResolvedValue([client]);
+      loadWorkerScript();
+
+      const waitUntil = vi.fn();
+      const done = dispatch("notificationclick", {
+        notification: { close: vi.fn(), data: { url: "/notifications" } },
+        waitUntil,
+      });
+      await vi.advanceTimersByTimeAsync(1500);
+      await done;
+
+      expect(client.postMessage).toHaveBeenCalledOnce();
+      expect(client.navigate).toHaveBeenCalledWith("/notifications");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

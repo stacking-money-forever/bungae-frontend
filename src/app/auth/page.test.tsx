@@ -179,7 +179,13 @@ describe("AuthPage", () => {
   it.each([
     "/meetups/b7c77e71-5b90-42f2-b9e1-8f6c8b1db76c",
     "/meetups/abc_DEF-123",
-  ])("returns to the safe meetup path %s after a successful OTP", async (next) => {
+    "/meetups/new",
+    "/meetups/abc_DEF-123/chat",
+    "/meetups/abc_DEF-123/check-in/success",
+    "/profile",
+    "/profile/no-show-appeals/appeal-1",
+    "/my-meetups",
+  ])("returns to the safe app path %s after a successful OTP", async (next) => {
     window.history.replaceState(null, "", `/auth?next=${encodeURIComponent(next)}`);
     const api = createApi();
     renderAuth(api);
@@ -204,7 +210,10 @@ describe("AuthPage", () => {
     "/meetups/../auth",
     "/meetups/abc/extra",
     "/meetups/",
-    "/profile",
+    "/auth",
+    "/profile?tab=x",
+    "/meetups/abc/chat/extra",
+    "/profilex",
     "javascript:alert(1)",
   ])("falls back to / after a successful OTP when next is unsafe (%s)", async (next) => {
     window.history.replaceState(null, "", `/auth?next=${encodeURIComponent(next)}`);
@@ -308,7 +317,7 @@ describe("AuthPage", () => {
     expect(screen.queryByRole("heading", { name: "인증번호를 입력해 주세요" })).not.toBeInTheDocument();
   });
 
-  it("does not commit a stale verification completion after the code changes", async () => {
+  it("locks the submitted code while it is verified and commits that session", async () => {
     const pendingSession = deferred<TokenSession>();
     const api = createApi({ createSession: vi.fn().mockReturnValue(pendingSession.promise) });
     renderAuth(api);
@@ -318,18 +327,20 @@ describe("AuthPage", () => {
     const otpInput = screen.getByRole("textbox", { name: "인증번호" });
     fireEvent.change(otpInput, { target: { value: "123456" } });
     fireEvent.submit(otpInput.closest("form")!);
+    expect(otpInput).toHaveAttribute("readonly");
     fireEvent.change(otpInput, { target: { value: "654321" } });
+    expect(otpInput).toHaveValue("123456");
     await act(async () => {
       pendingSession.resolve({
-        accessToken: "stale-access-token",
-        refreshToken: "stale-refresh-token",
+        accessToken: "access-token",
+        refreshToken: "refresh-token",
         expiresIn: 900,
         user,
       });
     });
 
-    expect(routerReplace).not.toHaveBeenCalled();
-    expect(otpInput).toHaveValue("654321");
+    expect(api.createSession).toHaveBeenCalledTimes(1);
+    expect(routerReplace).toHaveBeenCalledWith("/");
   });
 
   it("keeps the number editable from the OTP step", async () => {

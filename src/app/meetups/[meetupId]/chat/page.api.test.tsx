@@ -156,6 +156,70 @@ describe("MeetupChatPage API behavior", () => {
     expect(await screen.findByText("한 번만")).toBeInTheDocument();
   });
 
+  it("keeps the composer usable when an older-page load runs during a send", async () => {
+    const sendPending = Promise.withResolvers<Message>();
+    const olderPending = Promise.withResolvers<{ items: Message[] }>();
+    const listMeetupMessages = vi.fn().mockResolvedValueOnce({ items: [aMessage], nextCursor: "older" }).mockReturnValueOnce(olderPending.promise);
+    const createMeetupMessage = vi.fn().mockReturnValueOnce(sendPending.promise).mockResolvedValueOnce({ ...aMessage, id: "second", text: "두 번째" });
+    renderAuthenticated(createApi({ listMeetupMessages, createMeetupMessage }));
+    await screen.findByText("A 메시지");
+    typeDraft("첫 번째");
+    fireEvent.submit(screen.getByRole("button", { name: "메시지 보내기" }).closest("form")!);
+    fireEvent.click(screen.getByRole("button", { name: "메시지 더 보기" }));
+    await waitFor(() => expect(listMeetupMessages).toHaveBeenCalledTimes(2));
+    await act(async () => { sendPending.resolve({ ...aMessage, id: "first", text: "첫 번째" }); });
+    expect(await screen.findByText("첫 번째")).toBeInTheDocument();
+    await act(async () => { olderPending.resolve({ items: [otherMessage] }); });
+    expect(await screen.findByText("다른 참가자 메시지")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "새 메시지 확인" })[0]).toBeEnabled();
+    typeDraft("두 번째");
+    fireEvent.submit(screen.getByRole("button", { name: "메시지 보내기" }).closest("form")!);
+    expect(await screen.findByText("두 번째")).toBeInTheDocument();
+    expect(createMeetupMessage).toHaveBeenCalledTimes(2);
+  });
+
+  it("releases the in-flight send when a manual refresh starts before it settles", async () => {
+    const sendPending = Promise.withResolvers<Message>();
+    const createMeetupMessage = vi.fn().mockReturnValueOnce(sendPending.promise).mockResolvedValueOnce({ ...aMessage, id: "second", text: "두 번째" });
+    renderAuthenticated(createApi({ createMeetupMessage }));
+    await screen.findByText("A 메시지");
+    typeDraft("첫 번째");
+    fireEvent.submit(screen.getByRole("button", { name: "메시지 보내기" }).closest("form")!);
+    fireEvent.click(screen.getAllByRole("button", { name: "새 메시지 확인" })[0]);
+    await act(async () => { sendPending.resolve({ ...aMessage, id: "first", text: "첫 번째" }); });
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "메시지 입력" })).toHaveValue(""));
+    typeDraft("두 번째");
+    await waitFor(() => expect(screen.getByRole("button", { name: "메시지 보내기" })).toBeEnabled());
+    fireEvent.submit(screen.getByRole("button", { name: "메시지 보내기" }).closest("form")!);
+    await waitFor(() => expect(createMeetupMessage).toHaveBeenCalledTimes(2));
+  });
+
+  it("keeps a message acknowledged while a full refresh is loading an older page", async () => {
+    const sendPending = Promise.withResolvers<Message>();
+    const refreshPending = Promise.withResolvers<{ items: Message[] }>();
+    const listMeetupMessages = vi.fn().mockResolvedValueOnce({ items: [aMessage] }).mockReturnValueOnce(refreshPending.promise);
+    const createMeetupMessage = vi.fn().mockReturnValueOnce(sendPending.promise);
+    renderAuthenticated(createApi({ listMeetupMessages, createMeetupMessage }));
+    await screen.findByText("A 메시지");
+    typeDraft("새로 보낸 메시지");
+    fireEvent.submit(screen.getByRole("button", { name: "메시지 보내기" }).closest("form")!);
+    fireEvent.click(screen.getAllByRole("button", { name: "새 메시지 확인" })[0]);
+    await waitFor(() => expect(listMeetupMessages).toHaveBeenCalledTimes(2));
+    await act(async () => { sendPending.resolve({ ...aMessage, id: "sent", text: "새로 보낸 메시지" }); });
+    await act(async () => { refreshPending.resolve({ items: [aMessage] }); });
+    expect(await screen.findByText("새로 보낸 메시지")).toBeInTheDocument();
+    expect(screen.getAllByText("새로 보낸 메시지")).toHaveLength(1);
+  });
+
+  it("falls back to the generic send error when a problem has no detail", async () => {
+    const createMeetupMessage = vi.fn().mockRejectedValue(new ApiProblemError(409, { type: "about:blank", title: "", status: 409, detail: "", instance: "", code: "CONFLICT", traceId: "" }));
+    renderAuthenticated(createApi({ createMeetupMessage }));
+    await screen.findByText("A 메시지");
+    typeDraft("보내기");
+    fireEvent.submit(screen.getByRole("button", { name: "메시지 보내기" }).closest("form")!);
+    expect(await screen.findByText("메시지를 보내지 못했어요.")).toBeInTheDocument();
+  });
+
   it("reuses the failed text key, creates a new key for changed text, and permits retry", async () => {
     const createMeetupMessage = vi.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce({ ...aMessage, id: "retry", text: "재시도" }).mockResolvedValueOnce({ ...aMessage, id: "changed", text: "변경" });
     renderAuthenticated(createApi({ createMeetupMessage }));

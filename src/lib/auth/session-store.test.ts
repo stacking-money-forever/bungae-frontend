@@ -170,6 +170,113 @@ describe("AuthSessionStore", () => {
     expect(store.getSnapshot()).toEqual({ status: "anonymous", user: null });
   });
 
+  it.each([
+    ["network failure", new TypeError("Failed to fetch")],
+    ["server error", new ApiProblemError(503, null)],
+    ["rate limit", new ApiProblemError(429, null)],
+  ])("keeps the session when refresh fails with a transient %s", async (_label, failure) => {
+    let clock = 0;
+    const api = createApi({
+      createSession: vi.fn().mockResolvedValue(tokenSession({ expiresIn: 1 })),
+      refreshSession: vi.fn().mockRejectedValueOnce(failure).mockResolvedValueOnce(tokenSession({ accessToken: "access-2" })),
+    });
+    const store = new AuthSessionStore(api, () => clock);
+    await store.createSession({ requestId: user.id, otp: "123456" });
+    clock = 1_000;
+
+    await expect(store.getMe()).rejects.toBe(failure);
+    expect(store.getSnapshot()).toEqual({ status: "authenticated", user });
+
+    await expect(store.getAccessToken()).resolves.toBe("access-2");
+    expect(api.refreshSession).toHaveBeenNthCalledWith(2, "refresh-1");
+  });
+
+  it("ends the issued server session when the caller abandons the login", async () => {
+    const api = createApi({ deleteCurrentSession: vi.fn().mockRejectedValue(new Error("offline")) });
+    const store = new AuthSessionStore(api);
+
+    await expect(store.createSession({ requestId: user.id, otp: "123456" }, () => false)).resolves.toBeNull();
+
+    expect(api.deleteCurrentSession).toHaveBeenCalledWith("access-1");
+    expect(store.getSnapshot()).toEqual({ status: "anonymous", user: null });
+  });
+
+  describe("navigation handoff", () => {
+    const KEY = "bungae.auth.navigation-handoff";
+
+    it("restores once on the next load and removes the entry before refreshing", async () => {
+      const clock = 0;
+      const storage = window.sessionStorage;
+      storage.clear();
+      const first = new AuthSessionStore(createApi(), () => clock);
+      await first.createSession({ requestId: user.id, otp: "123456" });
+      expect(first.handoffForNavigation(storage)).toBe(true);
+
+      const refreshSession = vi.fn().mockImplementation(async () => {
+        expect(storage.getItem(KEY)).toBeNull();
+        return tokenSession({ accessToken: "access-2", refreshToken: "refresh-2" });
+      });
+      const next = new AuthSessionStore(createApi({ refreshSession }), () => clock);
+      await expect(next.resumeFromHandoff(storage)).resolves.toEqual({ status: "restored", user });
+      expect(refreshSession).toHaveBeenCalledWith("refresh-1");
+      expect(next.getSnapshot()).toEqual({ status: "authenticated", user });
+      await expect(new AuthSessionStore(createApi(), () => clock).resumeFromHandoff(storage)).resolves.toEqual({ status: "none" });
+    });
+
+    it("reports a rejected restore instead of silently staying anonymous", async () => {
+      const storage = window.sessionStorage;
+      storage.clear();
+      const first = new AuthSessionStore(createApi());
+      await first.createSession({ requestId: user.id, otp: "123456" });
+      first.handoffForNavigation(storage);
+      const failure = new ApiProblemError(401, null);
+      const next = new AuthSessionStore(createApi({ refreshSession: vi.fn().mockRejectedValue(failure) }));
+
+      await expect(next.resumeFromHandoff(storage)).resolves.toEqual({ status: "failed", error: failure });
+      expect(storage.getItem(KEY)).toBeNull();
+    });
+
+    it("ignores an expired handoff and one answered for another account", async () => {
+      let clock = 0;
+      const storage = window.sessionStorage;
+      storage.clear();
+      const first = new AuthSessionStore(createApi(), () => clock);
+      await first.createSession({ requestId: user.id, otp: "123456" });
+      first.handoffForNavigation(storage);
+      clock = 10 * 60 * 1000;
+      const refreshSession = vi.fn();
+      await expect(new AuthSessionStore(createApi({ refreshSession }), () => clock).resumeFromHandoff(storage)).resolves.toEqual({ status: "none" });
+      expect(refreshSession).not.toHaveBeenCalled();
+
+      clock = 0;
+      first.handoffForNavigation(storage);
+      const other = new AuthSessionStore(createApi({ refreshSession: vi.fn().mockResolvedValue(tokenSession({ user: anotherUser })) }), () => clock);
+      await expect(other.resumeFromHandoff(storage)).resolves.toEqual({ status: "none" });
+      expect(other.getSnapshot()).toEqual({ status: "anonymous", user: null });
+    });
+
+    it("discards a pending handoff on logout, on a token refresh, and on request", async () => {
+      let clock = 0;
+      const storage = window.sessionStorage;
+      storage.clear();
+      const store = new AuthSessionStore(createApi({ createSession: vi.fn().mockResolvedValue(tokenSession({ expiresIn: 1 })) }), () => clock);
+      await store.createSession({ requestId: user.id, otp: "123456" });
+
+      store.handoffForNavigation(storage);
+      clock = 1_000;
+      await store.getAccessToken();
+      expect(storage.getItem(KEY)).toBeNull();
+
+      store.handoffForNavigation(storage);
+      store.discardNavigationHandoff(storage);
+      expect(storage.getItem(KEY)).toBeNull();
+
+      store.handoffForNavigation(storage);
+      await store.deleteCurrentSession();
+      expect(storage.getItem(KEY)).toBeNull();
+    });
+  });
+
   it("does not let an old refresh resolve with a replacement session", async () => {
     let clock = 0;
     const oldRefresh = deferred<TokenSession>();

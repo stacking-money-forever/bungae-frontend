@@ -57,33 +57,45 @@ export class ApiProblemError extends Error {
     readonly status: number,
     readonly problem: ProblemDetails | null,
   ) {
-    super(problem?.title ?? `API request failed with ${status}`);
+    super(problem?.title || `API request failed with ${status}`);
     this.name = "ApiProblemError";
   }
 }
 
-function isProblemDetails(value: unknown): value is ProblemDetails {
-  if (!value || typeof value !== "object") return false;
+function stringField(problem: Record<string, unknown>, key: string): string {
+  const value = problem[key];
+  return typeof value === "string" ? value : "";
+}
+
+function isProblemFieldError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const record = error as Record<string, unknown>;
+  return typeof record.field === "string" && typeof record.code === "string" && typeof record.message === "string";
+}
+
+/**
+ * Normalizes an RFC 9457 body. A problem is kept when it carries a string
+ * `code` or `title`; optional members that are missing or mistyped become ""
+ * (or are dropped for `errors`) instead of discarding the whole problem, so
+ * code-specific guidance still reaches the user.
+ */
+function toProblemDetails(value: unknown, responseStatus: number): ProblemDetails | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const problem = value as Record<string, unknown>;
-  return (
-    typeof problem.type === "string" &&
-    typeof problem.title === "string" &&
-    typeof problem.status === "number" &&
-    typeof problem.detail === "string" &&
-    typeof problem.instance === "string" &&
-    typeof problem.code === "string" &&
-    typeof problem.traceId === "string" &&
-    (problem.errors === undefined ||
-      (Array.isArray(problem.errors) &&
-        problem.errors.every(
-          (error) =>
-            Boolean(error) &&
-            typeof error === "object" &&
-            typeof (error as Record<string, unknown>).field === "string" &&
-            typeof (error as Record<string, unknown>).code === "string" &&
-            typeof (error as Record<string, unknown>).message === "string",
-        )))
-  );
+  if (typeof problem.code !== "string" && typeof problem.title !== "string") return null;
+  const errors = Array.isArray(problem.errors) && problem.errors.every(isProblemFieldError)
+    ? (problem.errors as ProblemDetails["errors"])
+    : undefined;
+  return {
+    type: stringField(problem, "type") || "about:blank",
+    title: stringField(problem, "title"),
+    status: typeof problem.status === "number" ? problem.status : responseStatus,
+    detail: stringField(problem, "detail"),
+    instance: stringField(problem, "instance"),
+    code: stringField(problem, "code"),
+    traceId: stringField(problem, "traceId"),
+    ...(errors ? { errors } : {}),
+  };
 }
 
 async function readProblem(response: Response): Promise<ProblemDetails | null> {
@@ -92,7 +104,7 @@ async function readProblem(response: Response): Promise<ProblemDetails | null> {
   }
 
   const payload = await response.json().catch(() => null);
-  return isProblemDetails(payload) ? payload : null;
+  return toProblemDetails(payload, response.status);
 }
 
 export type BungaeApi = {

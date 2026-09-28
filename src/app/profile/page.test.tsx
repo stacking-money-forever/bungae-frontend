@@ -10,9 +10,9 @@ import {
 } from "@/lib/auth/auth-session-provider";
 import ProfilePage from "./page";
 
-function renderProfile() {
+function renderProfile(api?: BungaeApi) {
   return render(
-    <AuthSessionProvider>
+    <AuthSessionProvider api={api}>
       <ProfilePage />
     </AuthSessionProvider>,
   );
@@ -143,13 +143,14 @@ function renderSwitchableProfile(api: BungaeApi) {
 describe("ProfilePage", () => {
   afterEach(() => {
     setOnline(true);
+    window.sessionStorage.clear();
   });
 
   it("keeps the anonymous profile route behind phone login", () => {
     renderProfile();
 
     expect(screen.getByRole("heading", { name: "로그인하고 프로필을 확인해 주세요" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "휴대전화로 로그인하기" })).toHaveAttribute("href", "/auth");
+    expect(screen.getByRole("link", { name: "휴대전화로 로그인하기" })).toHaveAttribute("href", "/auth?next=%2Fprofile");
     expect(screen.queryByRole("button", { name: "표시 프로필 수정" })).not.toBeInTheDocument();
     expect(screen.queryByText("본인 인증 완료 · 출석 신뢰 안정적")).not.toBeInTheDocument();
   });
@@ -264,6 +265,45 @@ describe("ProfilePage", () => {
     expect(await screen.findByRole("button", { name: "인증 제공자에서 계속하기" })).toBeInTheDocument();
     expect(api.createVerificationSession).toHaveBeenCalledWith(`${window.location.origin}/profile`, "access-token");
     expect(window.location.href).toBe(originalHref);
+  });
+
+  it("restores the session handed off before the verification provider round trip", async () => {
+    window.sessionStorage.setItem("bungae.auth.navigation-handoff", JSON.stringify({ refreshToken: "handoff-refresh", subject: authenticatedUser.id, expiresAt: Date.now() + 60_000 }));
+    const refresh = Promise.withResolvers<{ accessToken: string; refreshToken: string; expiresIn: number; user: typeof authenticatedUser }>();
+    const api = createApi({ refreshSession: vi.fn().mockReturnValue(refresh.promise) });
+    renderProfile(api);
+
+    expect(screen.getByRole("status")).toHaveTextContent("로그인 상태를 확인하고 있어요.");
+    expect(screen.queryByRole("link", { name: "휴대전화로 로그인하기" })).not.toBeInTheDocument();
+    await act(async () => refresh.resolve({ accessToken: "access-token", refreshToken: "rotated", expiresIn: 900, user: authenticatedUser }));
+
+    expect(await screen.findByRole("heading", { name: "민지" })).toBeInTheDocument();
+    expect(api.refreshSession).toHaveBeenCalledWith("handoff-refresh");
+    expect(window.sessionStorage.getItem("bungae.auth.navigation-handoff")).toBeNull();
+  });
+
+  it("tells the user to sign in again when the handed-off session cannot be restored", async () => {
+    window.sessionStorage.setItem("bungae.auth.navigation-handoff", JSON.stringify({ refreshToken: "handoff-refresh", subject: authenticatedUser.id, expiresAt: Date.now() + 60_000 }));
+    renderProfile(createApi({ refreshSession: vi.fn().mockRejectedValue(new ApiProblemError(401, null)) }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("인증 후 로그인 상태를 이어 가지 못했어요.");
+    expect(screen.getByRole("link", { name: "휴대전화로 로그인하기" })).toHaveAttribute("href", "/auth?next=%2Fprofile");
+  });
+
+  it("warns before leaving for the provider when the session cannot be handed off", async () => {
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("blocked", "SecurityError");
+    });
+    try {
+      renderAuthenticatedProfile(createApi());
+      await screen.findByRole("heading", { name: "민지" });
+      fireEvent.click(screen.getByRole("button", { name: "인증 시작" }));
+      fireEvent.click(await screen.findByRole("button", { name: "인증 제공자에서 계속하기" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("계속하면 인증을 마친 뒤 다시 로그인해야 해요.");
+    } finally {
+      setItem.mockRestore();
+    }
   });
 
   it("rejects an unsafe verification provider URL without rendering a navigation control", async () => {

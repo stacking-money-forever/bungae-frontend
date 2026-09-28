@@ -121,7 +121,7 @@ export default function MeetupDetailPage() {
         status: "error",
         meetup: null,
         relation: null,
-        error: error instanceof ApiProblemError ? error.problem?.detail ?? "모임을 불러오지 못했어요." : "모임을 불러오지 못했어요.",
+        error: error instanceof ApiProblemError ? error.problem?.detail || "모임을 불러오지 못했어요." : "모임을 불러오지 못했어요.",
       });
     }
   }, [auth, meetupId, sessionEpoch, subject]);
@@ -164,6 +164,7 @@ export default function MeetupDetailPage() {
     error: string | null;
   }>({ identity: "", status: "idle", error: null });
   const joinAttemptRef = useRef<{ identity: string; idempotencyKey: string; inFlight: Promise<JoinResult> | null } | null>(null);
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const leaveAttemptRef = useRef<{ identity: string; inFlight: Promise<void> | null } | null>(null);
   const activeJoinState = joinState.identity === detailLocalIdentity ? joinState : { identity: detailLocalIdentity, status: "idle" as const, result: null, error: null };
   const activeLeaveState = leaveState.identity === detailLocalIdentity ? leaveState : { identity: detailLocalIdentity, status: "idle" as const, error: null };
@@ -181,6 +182,7 @@ export default function MeetupDetailPage() {
     reportAttemptRef.current = null;
     joinAttemptRef.current = null;
     leaveAttemptRef.current = null;
+    setLeaveConfirmOpen(false);
     setJoinState({ identity: detailLocalIdentity, status: "idle", result: null, error: null });
     setLeaveState({ identity: detailLocalIdentity, status: "idle", error: null });
     setDetailLocalStateIdentity(detailLocalIdentity);
@@ -238,7 +240,7 @@ export default function MeetupDetailPage() {
       setReportOpen(false);
     } catch (error) {
       if (subjectRef.current !== subject || meetupIdRef.current !== meetupId || error instanceof SessionExpiredError) return;
-      setReportError(error instanceof ApiProblemError ? error.problem?.detail ?? "신고를 접수하지 못했어요." : "신고를 접수하지 못했어요.");
+      setReportError(error instanceof ApiProblemError ? error.problem?.detail || "신고를 접수하지 못했어요." : "신고를 접수하지 못했어요.");
     } finally {
       attempt.inFlight = false;
       if (subjectRef.current === subject && meetupIdRef.current === meetupId) setReportPending(false);
@@ -270,7 +272,7 @@ export default function MeetupDetailPage() {
       await loadMeetup();
     } catch (error) {
       if (subjectRef.current !== subject || meetupIdRef.current !== meetupId) return;
-      setJoinState({ identity: detailLocalIdentity, status: "error", result: null, error: error instanceof ApiProblemError ? error.problem?.detail ?? "참여를 처리하지 못했어요." : "참여를 처리하지 못했어요." });
+      setJoinState({ identity: detailLocalIdentity, status: "error", result: null, error: error instanceof ApiProblemError ? error.problem?.detail || "참여를 처리하지 못했어요." : "참여를 처리하지 못했어요." });
       await loadMeetup();
     } finally {
       if (joinAttemptRef.current === existing) existing.inFlight = null;
@@ -296,7 +298,7 @@ export default function MeetupDetailPage() {
       await loadMeetup();
     } catch (error) {
       if (subjectRef.current !== subject || meetupIdRef.current !== meetupId) return;
-      setLeaveState({ identity: detailLocalIdentity, status: "error", error: error instanceof ApiProblemError ? error.problem?.detail ?? "참여 취소를 처리하지 못했어요." : "참여 취소를 처리하지 못했어요." });
+      setLeaveState({ identity: detailLocalIdentity, status: "error", error: error instanceof ApiProblemError ? error.problem?.detail || "참여 취소를 처리하지 못했어요." : "참여 취소를 처리하지 못했어요." });
       await loadMeetup();
     } finally {
       if (leaveAttemptRef.current === existing) existing.inFlight = null;
@@ -345,6 +347,9 @@ export default function MeetupDetailPage() {
     : "";
   const hasJoinAction = Boolean(currentMeetup?.allowedActions.includes("JOIN") && !currentRelation && !activeJoinState.result);
   const hasLeaveAction = Boolean(currentMeetup?.allowedActions.includes("LEAVE") || (currentMeetup?.state === "OPEN" && currentRelation === "PARTICIPANT"));
+  // A refetch that drops LEAVE closes the confirmation for good; it must not
+  // reopen by itself when LEAVE comes back.
+  if (leaveConfirmOpen && !hasLeaveAction) setLeaveConfirmOpen(false);
   const hasCancelAction = currentMeetup?.allowedActions.includes("CANCEL") ?? false;
   const hasQuorumDecisionAction = currentMeetup?.allowedActions.includes("QUORUM_DECISION") ?? false;
   const hasCheckInAction = currentMeetup?.allowedActions.includes("CHECK_IN") ?? false;
@@ -507,7 +512,7 @@ export default function MeetupDetailPage() {
               >
                 <ShieldCheck className="mt-0.5 shrink-0 text-[var(--fg-critical)]" size={18} strokeWidth={1.8} aria-hidden="true" />
                 <p className="m-0 text-[length:var(--type-body)] leading-[22px] text-[var(--fg-neutral)]">
-                  신고 내용을 이 화면에 기록했어요. 운영 검토 결과가 확정된 것은 아니에요.
+                  신고가 접수됐어요. 운영 검토 결과가 확정된 것은 아니에요.
                 </p>
               </div>
             ) : null}
@@ -598,6 +603,36 @@ export default function MeetupDetailPage() {
         </form>
       </AnimatedDialog>
 
+      <AnimatedDialog key={`leave:${detailLocalIdentity}`} open={detailLocalStateIsCurrent && leaveConfirmOpen && hasLeaveAction} onOpenChange={setLeaveConfirmOpen}>
+        <AnimatedDialogTitle className="m-0 text-[length:var(--type-section)] font-semibold leading-6 text-[var(--fg-neutral)]">
+          모임 참여를 취소할까요?
+        </AnimatedDialogTitle>
+        <AnimatedDialogDescription className="m-0 mt-2 text-[length:var(--type-body)] leading-[22px] text-[var(--fg-muted)]">
+          취소하면 참가 인원에서 빠지고, 다시 참여하려면 남은 자리가 있어야 해요.
+        </AnimatedDialogDescription>
+        <div className="mt-4 flex gap-2">
+          <AnimatedDialogClose asChild>
+            <button
+              type="button"
+              autoFocus
+              className="min-h-[48px] flex-1 rounded-[10px] border border-[var(--stroke-neutral)] px-4 text-[length:var(--type-action)] leading-6 text-[var(--fg-neutral)] focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
+            >
+              계속 참여하기
+            </button>
+          </AnimatedDialogClose>
+          <button
+            type="button"
+            disabled={activeLeaveState.status === "pending" || !online}
+            onClick={() => {
+              setLeaveConfirmOpen(false);
+              void leaveMeetup();
+            }}
+            className="min-h-[48px] flex-1 rounded-[10px] bg-[var(--fg-critical)] px-4 text-[length:var(--type-action)] font-semibold leading-6 text-white disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
+          >
+            참여 취소하기
+          </button>
+        </div>
+      </AnimatedDialog>
 
       {authenticatedActionCount > 0 ? (
         <BottomActionBar>
@@ -614,7 +649,7 @@ export default function MeetupDetailPage() {
           {hasLeaveAction ? (
             <button
               type="button"
-              onClick={() => void leaveMeetup()}
+              onClick={() => setLeaveConfirmOpen(true)}
               disabled={activeLeaveState.status === "pending" || !online}
               className="inline-flex min-h-[var(--action-primary-height)] w-full items-center justify-center rounded-[12px] border border-[var(--stroke-neutral)] bg-[var(--bg-layer-floating)] px-4 text-[length:var(--type-action)] font-bold leading-6 text-[var(--fg-critical)] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-[var(--fg-neutral)] focus-visible:outline-offset-2"
             >
