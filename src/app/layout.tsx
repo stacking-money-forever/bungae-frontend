@@ -8,6 +8,7 @@ import { PwaRoot } from "@/components/pwa-root";
 import { PageTransition } from "@/components/page-transition";
 import { PersistentBottomNavigation } from "@/components/persistent-bottom-navigation";
 import { ScreenLoading } from "@/components/screen-loading";
+import { ServiceWorkerNavigation } from "@/components/service-worker-navigation";
 
 import "./globals.css";
 
@@ -88,6 +89,7 @@ export default function RootLayout({
           </Suspense>
           <PersistentBottomNavigation />
           <PwaRoot />
+          <ServiceWorkerNavigation />
         </AuthSessionProvider>
       </body>
     </html>
