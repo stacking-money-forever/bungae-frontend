@@ -15,7 +15,42 @@ import { useOnlineStatus } from "@/lib/ui/online";
 
 const koreanMobilePattern = /^010-\d{4}-\d{4}$/;
 const otpPattern = /^[0-9]{6}$/;
-const postAuthPathPattern = /^\/meetups\/[A-Za-z0-9_-]+$/;
+const ID = "[A-Za-z0-9_-]+";
+const MEETUP_SUBROUTES = [
+  "attendance",
+  "chat",
+  "check-in",
+  "check-in/success",
+  "connections/matched",
+  "connections/select",
+  "feedback",
+  "hub",
+  "join",
+  "quorum-decision",
+  "quorum-update",
+  "safety-cancel",
+  "waitlist",
+].join("|");
+// Exact app routes a login may return to. `/auth` itself, query strings, and
+// anything outside these templates fall back to `/`.
+const postAuthPathPattern = new RegExp(
+  [
+    "/connections",
+    `/connections/${ID}`,
+    "/filters",
+    "/locations",
+    "/meetups/new",
+    `/meetups/${ID}`,
+    `/meetups/${ID}/(?:${MEETUP_SUBROUTES})`,
+    "/my-meetups",
+    "/notifications",
+    "/profile",
+    "/profile/(?:blocks|incidents|no-show-appeals|withdrawal)",
+    `/profile/no-show-appeals/${ID}`,
+  ]
+    .map((route) => `^${route}$`)
+    .join("|"),
+);
 
 function postAuthDestination(): string {
   const next = new URLSearchParams(window.location.search).get("next");
@@ -361,10 +396,14 @@ export default function AuthPage() {
                 pattern="[0-9]*"
                 maxLength={6}
                 value={otp}
+                readOnly={isVerifying}
+                aria-busy={isVerifying || undefined}
                 onChange={(event) => {
+                  // The submitted code stays locked while it is verified: the
+                  // server consumes it, so abandoning that result would force a
+                  // new OTP.
+                  if (verificationPendingRef.current) return;
                   verificationAttemptRef.current += 1;
-                  verificationPendingRef.current = false;
-                  setIsVerifying(false);
                   setOtp(event.target.value.replace(/\D/g, "").slice(0, 6));
                   setVerificationError(null);
                 }}

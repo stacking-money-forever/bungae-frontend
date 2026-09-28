@@ -84,7 +84,7 @@ export default function MeetupHubPage() {
         identity,
         status: "error",
         meetup: null,
-        error: error instanceof ApiProblemError ? error.problem?.detail ?? "모임을 불러오지 못했어요." : "모임을 불러오지 못했어요.",
+        error: error instanceof ApiProblemError ? error.problem?.detail || "모임을 불러오지 못했어요." : "모임을 불러오지 못했어요.",
       });
     }
   }, [auth, identity, meetupId, sessionEpoch, subject]);
@@ -114,7 +114,7 @@ export default function MeetupHubPage() {
           </p>
         </section>
         <BottomActionBar>
-          <Link className="inline-flex min-h-[var(--action-primary-height)] w-full items-center justify-center rounded-[12px] bg-[var(--brand-accent)] px-4 text-[length:var(--type-action)] font-bold leading-6 text-[var(--fg-on-brand)]" href="/auth">
+          <Link className="inline-flex min-h-[var(--action-primary-height)] w-full items-center justify-center rounded-[12px] bg-[var(--brand-accent)] px-4 text-[length:var(--type-action)] font-bold leading-6 text-[var(--fg-on-brand)]" href={`/auth?next=${encodeURIComponent(`${meetupPath}/hub`)}`}>
             휴대전화로 로그인하기
           </Link>
         </BottomActionBar>

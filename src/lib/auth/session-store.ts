@@ -70,15 +70,53 @@ export type RemoteLogoutResult =
   | { ok: true; attempted: boolean }
   | { ok: false; attempted: boolean; error: unknown };
 
+function isRefreshRejected(error: unknown): boolean {
+  return (
+    error instanceof ApiProblemError &&
+    error.status >= 400 &&
+    error.status < 500 &&
+    error.status !== 408 &&
+    error.status !== 429
+  );
+}
+
+export const NAVIGATION_HANDOFF_KEY = "bungae.auth.navigation-handoff";
+const NAVIGATION_HANDOFF_TTL_MS = 10 * 60 * 1000;
+
+type NavigationHandoff = { refreshToken: string; subject: string; expiresAt: number };
+
+function readHandoff(value: string | null): NavigationHandoff | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as Partial<NavigationHandoff>;
+    if (
+      typeof parsed.refreshToken !== "string" ||
+      typeof parsed.subject !== "string" ||
+      typeof parsed.expiresAt !== "number"
+    ) {
+      return null;
+    }
+    return parsed as NavigationHandoff;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * In-memory token coordinator. No browser persistence is used: every reload
- * requires reauthentication until the API contract specifies secure persistence.
+ * In-memory token coordinator. Tokens are not persisted: a reload requires
+ * reauthentication until the API contract specifies secure persistence.
+ *
+ * The one exception is an explicit same-tab navigation handoff (for example
+ * the identity verification provider round trip): the refresh token is placed
+ * in tab-scoped sessionStorage right before leaving, consumed once on return,
+ * and expires after a short TTL.
  */
 export class AuthSessionStore {
   private current: ActiveSession | null = null;
   private refreshInFlight = new WeakMap<ActiveSession, Promise<ActiveSession | null>>();
   private listeners = new Set<() => void>();
   private snapshot: AuthSnapshot = { status: "anonymous", user: null };
+  private handoffStorage: Storage | null = null;
 
   constructor(
     private readonly api: BungaeApi,
@@ -107,9 +145,81 @@ export class AuthSessionStore {
     canCommit?: () => boolean,
   ): Promise<UserProfile | null> {
     const session = await this.api.createSession(input);
-    if (canCommit && !canCommit()) return null;
+    if (canCommit && !canCommit()) {
+      // The caller abandoned this login: end the issued server session instead
+      // of leaving it orphaned. Best effort; nothing local was stored.
+      void this.api.deleteCurrentSession(session.accessToken).catch(() => undefined);
+      return null;
+    }
     this.setSession(session);
     return session.user;
+  }
+
+  /** Hands the current session to the next document load in this tab. */
+  handoffForNavigation(storage: Storage): boolean {
+    const session = this.current;
+    if (!session) return false;
+    const handoff: NavigationHandoff = {
+      refreshToken: session.refreshToken,
+      subject: session.user.id,
+      expiresAt: this.now() + NAVIGATION_HANDOFF_TTL_MS,
+    };
+    try {
+      storage.setItem(NAVIGATION_HANDOFF_KEY, JSON.stringify(handoff));
+    } catch {
+      return false;
+    }
+    this.handoffStorage = storage;
+    return true;
+  }
+
+  hasNavigationHandoff(storage: Storage): boolean {
+    try {
+      return storage.getItem(NAVIGATION_HANDOFF_KEY) !== null;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Drops a pending handoff when the planned navigation did not happen. */
+  discardNavigationHandoff(storage: Storage): void {
+    if (this.handoffStorage === storage) this.handoffStorage = null;
+    try {
+      storage.removeItem(NAVIGATION_HANDOFF_KEY);
+    } catch {
+      // Storage became unavailable; the entry still expires by its TTL.
+    }
+  }
+
+  /**
+   * Consumes a navigation handoff exactly once. The entry is removed before the
+   * refresh request so a failed or repeated load can never reuse it. A
+   * rejected refresh is reported as `failed` so the caller can tell the user
+   * to sign in again instead of silently showing an anonymous screen.
+   */
+  async resumeFromHandoff(
+    storage: Storage,
+  ): Promise<{ status: "none" } | { status: "restored"; user: UserProfile } | { status: "failed"; error: unknown }> {
+    let handoff: NavigationHandoff | null;
+    try {
+      handoff = readHandoff(storage.getItem(NAVIGATION_HANDOFF_KEY));
+      storage.removeItem(NAVIGATION_HANDOFF_KEY);
+    } catch {
+      return { status: "none" };
+    }
+    if (!handoff || handoff.expiresAt <= this.now() || this.current) return { status: "none" };
+
+    let next: TokenSession;
+    try {
+      next = await this.api.refreshSession(handoff.refreshToken);
+    } catch (error) {
+      return { status: "failed", error };
+    }
+    // A login that completed while the refresh was in flight wins, and a
+    // refresh answered for a different account is never adopted.
+    if (this.current || next.user.id !== handoff.subject) return { status: "none" };
+    this.setSession(next);
+    return { status: "restored", user: next.user };
   }
 
   async getAccessToken(): Promise<string | null> {
@@ -349,8 +459,19 @@ export class AuthSessionStore {
   clear(expectedSession?: ActiveSession): void {
     if (!this.current || (expectedSession && this.current !== expectedSession)) return;
     this.current = null;
+    this.discardHandoff();
     this.snapshot = { status: "anonymous", user: null };
     this.notify();
+  }
+
+  private discardHandoff(): void {
+    const storage = this.handoffStorage;
+    this.handoffStorage = null;
+    try {
+      storage?.removeItem(NAVIGATION_HANDOFF_KEY);
+    } catch {
+      // Storage became unavailable; the entry still expires by its TTL.
+    }
   }
 
   private async accessTokenFor(session: ActiveSession): Promise<string | null> {
@@ -371,6 +492,9 @@ export class AuthSessionStore {
       .refreshSession(session.refreshToken)
       .then((next) => {
         if (this.current !== session) return null;
+        // The old refresh token is rotated out; a pending handoff holding it
+        // could only fail or trip reuse detection.
+        this.discardHandoff();
         session.accessToken = next.accessToken;
         session.refreshToken = next.refreshToken;
         session.expiresAt = this.now() + next.expiresIn * 1000;
@@ -379,7 +503,11 @@ export class AuthSessionStore {
         this.notify();
         return session;
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        // Only a server rejection of the refresh token ends the session. A
+        // network failure, timeout, rate limit, or 5xx keeps the session so the
+        // caller can retry instead of forcing a new OTP.
+        if (!isRefreshRejected(error)) throw error;
         this.clear(session);
         return null;
       })
@@ -391,6 +519,7 @@ export class AuthSessionStore {
   }
 
   private setSession(session: TokenSession): void {
+    this.discardHandoff();
     this.current = {
       accessToken: session.accessToken,
       refreshToken: session.refreshToken,

@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -81,6 +82,16 @@ export type AuthSessionContextValue = {
    * provider; the session store transport is not modified.
    */
   sessionEpoch: number;
+  /** True while a same-tab navigation handoff is being restored on load. */
+  restoring: boolean;
+  /** Set when a navigation handoff existed but the session could not be restored. */
+  restoreFailed: boolean;
+  /**
+   * Keeps the session across one deliberate same-tab document navigation
+   * (for example the identity verification provider). Call right before
+   * leaving; returns false when the handoff could not be stored.
+   */
+  handoffForNavigation(): boolean;
   requestOtp(input: OtpRequest): Promise<OtpChallenge>;
   createSession(input: SessionRequest, canCommit?: () => boolean): Promise<UserProfile | null>;
   getAccessToken(): Promise<string | null>;
@@ -163,6 +174,54 @@ export function AuthSessionProvider({
     previousSubject.current = subject;
   }
   const sessionEpoch = sessionEpochRef.current;
+  const [restoring, setRestoring] = useState(false);
+  const [restoreFailed, setRestoreFailed] = useState(false);
+
+  // Layout effect: the restoring state must be committed before child pages
+  // paint an anonymous screen or run their own effects.
+  useLayoutEffect(() => {
+    let storage: Storage;
+    try {
+      storage = window.sessionStorage;
+    } catch {
+      return;
+    }
+    if (!store.hasNavigationHandoff(storage)) return;
+    // The handoff is consumed on the first run, so a Strict Mode re-run finds
+    // nothing; completion always ends the restoring state.
+    setRestoring(true);
+    void store.resumeFromHandoff(storage).then((result) => {
+      setRestoreFailed(result.status === "failed");
+      setRestoring(false);
+    });
+  }, [store]);
+
+  const handoffForNavigation = useCallback(() => {
+    let storage: Storage;
+    try {
+      storage = window.sessionStorage;
+    } catch {
+      return false;
+    }
+    if (!store.handoffForNavigation(storage)) return false;
+    // If this document survives (an external app handled the URL, the user
+    // cancelled, or a back-forward cache restore), the handoff must not let a
+    // later reload sign in silently.
+    const discard = () => {
+      window.removeEventListener("pageshow", onPageShow);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      store.discardNavigationHandoff(storage);
+    };
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) discard();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") discard();
+    };
+    window.addEventListener("pageshow", onPageShow);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return true;
+  }, [store]);
   const pushSession = useMemo<PushAuthSession | undefined>(() => {
     if (!subject) return undefined;
     return {
@@ -359,9 +418,15 @@ export function AuthSessionProvider({
       logout,
       pushDependencies,
       sessionEpoch,
+      restoring,
+      restoreFailed,
+      handoffForNavigation,
     }),
     [
       sessionEpoch,
+      restoring,
+      restoreFailed,
+      handoffForNavigation,
       listMyMeetups,
       listNotifications,
       markNotificationRead,
